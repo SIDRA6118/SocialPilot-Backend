@@ -179,6 +179,54 @@ function PageRenderer({ renderPage }) {
   return renderPage();
 }
 
+function MetricCard({ icon, tone, label, value, detail, trend }) {
+  return (
+    <article className="metric-card">
+      <div className={`metric-icon ${tone}`}>{icon}</div>
+      <div className="metric-copy">
+        <span>{label}</span>
+        <strong>{value}</strong>
+        <small>
+          <b>{trend}</b> {detail}
+        </small>
+      </div>
+    </article>
+  );
+}
+
+function LivePostPreview({ form, profile }) {
+  const previewDate = form.scheduled_time
+    ? new Date(form.scheduled_time).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+    : "Just now";
+
+  return (
+    <section className="card live-preview-card">
+      <div className="card-header posts-header">
+        <div>
+          <span className="section-kicker">LIVE PREVIEW</span>
+          <h2>See it before it goes live</h2>
+          <p>Your post preview updates as you write.</p>
+        </div>
+        <span className="preview-platform-label"><PlatformIcon platform={form.platform} /> {form.platform}</span>
+      </div>
+      <div className="social-preview">
+        <div className="social-preview-header">
+          <span className="preview-avatar">{profile.username.slice(0, 2).toUpperCase()}</span>
+          <div><strong>{profile.username}</strong><small>{form.platform} · {previewDate}</small></div>
+          <b>•••</b>
+        </div>
+        <p className="social-preview-content">{form.content || "Your post content will appear here..."}</p>
+        {form.media_url ? (
+          <img className="social-preview-media" src={form.media_url} alt="Post media preview" onError={(event) => { event.currentTarget.style.display = "none"; }} />
+        ) : (
+          <div className="social-preview-placeholder"><span>＋</span><small>Add a media URL to preview your visual</small></div>
+        )}
+        <div className="social-preview-actions"><span>♡ Like</span><span>◌ Comment</span><span>↗ Share</span><span>⌑ Save</span></div>
+      </div>
+    </section>
+  );
+}
+
 function App() {
   // =====================================================
   // AUTHENTICATION
@@ -1042,41 +1090,19 @@ function App() {
   // =====================================================
 
   const DashboardPage = () => {
+    const upcomingPosts = posts
+      .filter((post) => post.scheduled_time && new Date(post.scheduled_time) >= new Date())
+      .sort((first, second) => new Date(first.scheduled_time) - new Date(second.scheduled_time))
+      .slice(0, 4);
+
     return (
       <>
-        <section className="stats">
-          <div className="stat-card">
-            <div className="stat-icon blue">
-              📝
-            </div>
-
-            <div>
-              <span>Total Posts</span>
-              <h2>{totalPosts}</h2>
-            </div>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-icon purple">
-              📅
-            </div>
-
-            <div>
-              <span>Scheduled</span>
-              <h2>{scheduledPosts}</h2>
-            </div>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-icon green">
-              🚀
-            </div>
-
-            <div>
-              <span>Published</span>
-              <h2>{publishedPosts}</h2>
-            </div>
-          </div>
+        <section className="stats metric-grid">
+          <MetricCard icon="✦" tone="blue" label="Total posts" value={totalPosts} trend="All time" detail="in your workspace" />
+          <MetricCard icon="◷" tone="amber" label="Scheduled" value={scheduledPosts} trend="Ready" detail="to be published" />
+          <MetricCard icon="↗" tone="green" label="Published" value={publishedPosts} trend="Live" detail="across your channels" />
+          <MetricCard icon="◎" tone="rose" label="Connected" value={socialAccounts.length} trend="Active" detail="social accounts" />
+          <MetricCard icon="♧" tone="violet" label="Team members" value={teamMembers.length} trend="Shared" detail="workspace collaborators" />
         </section>
 
         <section className="dashboard-grid">
@@ -1114,6 +1140,7 @@ function App() {
                 placeholder="What would you like to share?"
                 rows={6}
               />
+              <div className="composer-meta"><span>Use a clear hook and one idea per post.</span><strong>{form.content.length}/2,200</strong></div>
 
               <div className="form-row">
                 <div className="form-group">
@@ -1321,6 +1348,8 @@ function App() {
           </div>
         </section>
 
+        <LivePostPreview form={form} profile={profile} />
+
         <section className="card posts-card">
           <div className="card-header posts-header">
             <div>
@@ -1394,6 +1423,39 @@ function App() {
               View All Posts →
             </button>
           )}
+        </section>
+
+        <section className="dashboard-lower-grid">
+          <div className="card upcoming-card">
+            <div className="card-header posts-header">
+              <div>
+                <span className="section-kicker">CONTENT QUEUE</span>
+                <h2>Upcoming posts</h2>
+                <p>Your next scheduled moments, ready at a glance.</p>
+              </div>
+              <button type="button" className="text-button" onClick={() => setActivePage("calendar")}>View calendar <span>→</span></button>
+            </div>
+            {upcomingPosts.length === 0 ? (
+              <div className="compact-empty"><span>◷</span><p>No upcoming posts yet.</p></div>
+            ) : (
+              <div className="upcoming-list">
+                {upcomingPosts.map((post) => (
+                  <button type="button" className="upcoming-item" key={post.id} onClick={() => startEdit(post)}>
+                    <span className="upcoming-platform"><PlatformIcon platform={post.platform} /></span>
+                    <span className="upcoming-copy"><strong>{post.content || "Untitled post"}</strong><small>{post.platform} · {new Date(post.scheduled_time).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</small></span>
+                    <span className={`status ${(post.status || "scheduled").toLowerCase()}`}>{post.status || "Scheduled"}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="card dashboard-note-card">
+            <span className="section-kicker">WORKSPACE NOTE</span>
+            <h2>Consistency compounds.</h2>
+            <p>Keep your publishing rhythm visible, then use Analytics to spot the channels that deserve more of your attention.</p>
+            <button type="button" className="text-button note-link" onClick={() => setActivePage("analytics")}>Open analytics <span>→</span></button>
+          </div>
         </section>
       </>
     );
@@ -2382,14 +2444,33 @@ function App() {
               {pageDescription[activePage]}
             </p>
           </div>
-
-          <button
-            className="refresh-btn"
-            onClick={fetchPosts}
-            disabled={loading}
-          >
-            🔄 Refresh
-          </button>
+          <div className="topbar-actions">
+            <label className="topbar-search">
+              <span aria-hidden="true">⌕</span>
+              <input
+                aria-label="Search posts"
+                placeholder="Search posts"
+                value={searchTerm}
+                onChange={(event) => {
+                  setSearchTerm(event.target.value);
+                  if (event.target.value && activePage !== "posts") setActivePage("posts");
+                }}
+              />
+            </label>
+            <button type="button" className="icon-button" title="Notifications" onClick={() => setMessage(notifications ? "You are all caught up." : "Notifications are disabled in Settings.")}>♢</button>
+            <button type="button" className="topbar-profile" title="Open settings" onClick={() => setActivePage("settings")}>
+              <span className="topbar-avatar">{profile.username.slice(0, 2).toUpperCase()}</span>
+              <span>{profile.username}</span>
+              <b>⌄</b>
+            </button>
+            <button
+              className="refresh-btn topbar-refresh"
+              onClick={fetchPosts}
+              disabled={loading}
+            >
+              ↻ Refresh
+            </button>
+          </div>
         </header>
 
         <MessageBox message={message} />
