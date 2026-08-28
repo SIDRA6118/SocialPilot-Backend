@@ -549,6 +549,46 @@ body.dark-mode select {
   margin-top: 22px;
 }
 
+.analytics-chart {
+  position: relative;
+  width: 100%;
+}
+
+.analytics-bar-chart {
+  height: 280px;
+  margin-top: 6px;
+}
+
+.analytics-doughnut-chart {
+  height: 280px;
+  max-width: 340px;
+  margin: 0 auto;
+}
+
+.chart-center-label {
+  position: absolute;
+  top: 43%;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translate(-50%, -50%);
+  color: #172033;
+  font-size: 24px;
+  pointer-events: none;
+}
+
+.chart-center-label small {
+  margin-top: 2px;
+  color: #8a94a6;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+body.dark-mode .chart-center-label {
+  color: #f8fafc;
+}
+
 body.dark-mode .check-row,
 body.dark-mode .team-section {
   color: #dbe3ef;
@@ -1997,5 +2037,257 @@ body.dark-mode .sidebar-switch {
 body:not(.dark-mode) .delete-btn:hover {
   background: #fef2f2;
   border-color: #fecaca;
+}
+
+/* =====================================================
+   RESPONSIVE LAYOUT POLISH
+===================================================== */
+
+html,
+body,
+#root {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.main,
+.card,
+.dashboard-grid,
+.posts-card,
+.post-item,
+.post-content {
+  min-width: 0;
+}
+
+@media (max-width: 1100px) {
+  .main {
+    padding: 24px;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: minmax(0, 1.2fr) minmax(280px, 1fr);
+  }
+
+  .card {
+    padding: 20px;
+  }
+}
+
+@media (max-width: 860px) {
+  .sidebar {
+    width: 76px;
+  }
+
+  .logo {
+    justify-content: center;
+    padding: 18px 10px;
+  }
+
+  .logo > div:last-child,
+  .sidebar nav a {
+    font-size: 0;
+  }
+
+  .logo > div:last-child,
+  .profile > div:last-child {
+    display: none;
+  }
+
+  .sidebar nav {
+    padding: 18px 10px;
+  }
+
+  .sidebar nav a {
+    justify-content: center;
+    padding: 13px 8px;
+  }
+
+  .sidebar nav a span {
+    width: auto;
+    font-size: 18px;
+  }
+
+  .sidebar-bottom {
+    padding: 12px 9px;
+  }
+
+  .profile {
+    justify-content: center;
+  }
+
+  .sidebar-switch {
+    padding: 8px 4px;
+    font-size: 0;
+  }
+
+  .sidebar-switch::before {
+    content: "⇄";
+    font-size: 16px;
+  }
+
+  .main {
+    width: calc(100% - 76px);
+    margin-left: 76px;
+    padding: 22px;
+  }
+
+  .dashboard-grid,
+  .stats {
+    grid-template-columns: 1fr;
+  }
+
+  .stats {
+    gap: 12px;
+  }
+}
+
+@media (max-width: 600px) {
+  .main {
+    width: calc(100% - 64px);
+    margin-left: 64px;
+    padding: 16px 12px 24px;
+  }
+
+  .sidebar {
+    width: 64px;
+  }
+
+  .topbar {
+    gap: 14px;
+    margin-bottom: 18px;
+  }
+
+  .topbar h1 {
+    font-size: 24px;
+    line-height: 1.15;
+  }
+
+  .topbar p {
+    max-width: 280px;
+    font-size: 12px;
+  }
+
+  .topbar .refresh-btn {
+    width: auto;
+    align-self: stretch;
+  }
+
+  .card {
+    padding: 16px;
+    border-radius: 11px;
+  }
+
+  .card-header {
+    gap: 10px;
+    margin-bottom: 17px;
+  }
+
+  .card-header h2 {
+    font-size: 17px;
+  }
+
+  .card-header p {
+    font-size: 12px;
+  }
+
+  .form-row,
+  .profile-form-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .form-row {
+    margin-top: 13px;
+  }
+
+  .integration-section,
+  .profile-section,
+  .saved-signins-section {
+    padding: 15px;
+  }
+
+  .integration-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .integration-heading,
+  .settings-section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .integration-count,
+  .settings-edit-button {
+    align-self: flex-start;
+  }
+
+  .profile-summary {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .profile-badge {
+    margin-left: 61px;
+  }
+
+  .post-item {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .post-content {
+    width: calc(100% - 56px);
+  }
+
+  .post-top {
+    align-items: flex-start;
+  }
+
+  .post-top .status {
+    margin-left: auto;
+  }
+
+  .delete-btn {
+    margin-left: 0;
+  }
+
+  .calendar-day {
+    min-height: 76px;
+    padding: 5px !important;
+  }
+
+  .analytics-bar-chart,
+  .analytics-doughnut-chart {
+    height: 230px;
+  }
+}
+
+@media (max-width: 380px) {
+  .main {
+    padding-right: 9px;
+    padding-left: 9px;
+  }
+
+  .stats {
+    gap: 9px;
+  }
+
+  .stat-card {
+    padding: 14px;
+  }
+
+  .stat-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .calendar-day {
+    min-height: 62px;
+    font-size: 11px;
+  }
+
+  .calendar-day strong {
+    font-size: 11px;
+  }
 }
 

@@ -1,4 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ArcElement,
+  BarElement,
+  CategoryScale,
+  Chart as ChartJS,
+  Filler,
+  Legend,
+  LinearScale,
+  Tooltip,
+} from "chart.js";
+import { Bar, Doughnut } from "react-chartjs-2";
 import "./App.css";
 import Login from "./Login";
 import Register from "./Register";
@@ -16,6 +27,16 @@ const SOCIAL_PLATFORMS = [
   { name: "YouTube", icon: "▶", color: "#ff0000", description: "Video publishing and channel management" },
   { name: "Pinterest", icon: "P", color: "#bd081c", description: "Pins, boards, and visual discovery" },
 ];
+
+ChartJS.register(
+  ArcElement,
+  BarElement,
+  CategoryScale,
+  Filler,
+  Legend,
+  LinearScale,
+  Tooltip
+);
 
 const getHeaders = () => {
   const accessToken = localStorage.getItem("access_token");
@@ -1683,6 +1704,61 @@ function App() {
   // =====================================================
 
   const AnalyticsPage = () => {
+    const chartLabels = Object.keys(platformStats);
+    const platformChartData = {
+      labels: chartLabels,
+      datasets: [
+        {
+          label: "Posts",
+          data: Object.values(platformStats),
+          backgroundColor: ["#2563eb", "#111827", "#1877f2", "#d62976", "#ef4444", "#bd081c"],
+          borderRadius: 8,
+          borderSkipped: false,
+          maxBarThickness: 42,
+        },
+      ],
+    };
+
+    const statusChartData = {
+      labels: ["Scheduled", "Published", "Failed"],
+      datasets: [
+        {
+          data: [scheduledPosts, publishedPosts, failedPosts],
+          backgroundColor: ["#f59e0b", "#22c55e", "#ef4444"],
+          borderColor: "#ffffff",
+          borderWidth: 4,
+          hoverOffset: 8,
+        },
+      ],
+    };
+
+    const chartOptions = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          displayColors: false,
+          padding: 10,
+          callbacks: { label: (context) => `${context.parsed.y ?? context.parsed} posts` },
+        },
+      },
+      scales: {
+        y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: "rgba(148, 163, 184, 0.18)" } },
+        x: { grid: { display: false } },
+      },
+    };
+
+    const doughnutOptions = {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: "70%",
+      plugins: {
+        legend: { position: "bottom", labels: { usePointStyle: true, padding: 18 } },
+        tooltip: { padding: 10 },
+      },
+    };
+
     return (
       <>
         <section className="stats">
@@ -1736,75 +1812,9 @@ function App() {
               </span>
             </div>
 
-            {Object.entries(
-              platformStats
-            ).map(([platform, count]) => {
-              const percentage =
-                totalPosts > 0
-                  ? Math.round(
-                      (count /
-                        totalPosts) *
-                        100
-                    )
-                  : 0;
-
-              return (
-                <div
-                  key={platform}
-                  style={{
-                    marginBottom: "18px",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent:
-                        "space-between",
-                      marginBottom: "7px",
-                    }}
-                  >
-                    <strong>
-                      {platform}
-                    </strong>
-
-                    <span>
-                      {count} posts
-                    </span>
-                  </div>
-
-                  <div
-                    style={{
-                      width: "100%",
-                      height: "9px",
-                      borderRadius: "10px",
-                      background:
-                        "#e5e7eb",
-                      overflow: "hidden",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: `${percentage}%`,
-                        height: "100%",
-                        borderRadius:
-                          "10px",
-                        background:
-                          "linear-gradient(135deg, #4f46e5, #7c3aed)",
-                      }}
-                    />
-                  </div>
-
-                  <small
-                    style={{
-                      color: "#64748b",
-                    }}
-                  >
-                    {percentage}% of total
-                    posts
-                  </small>
-                </div>
-              );
-            })}
+            <div className="analytics-chart analytics-bar-chart">
+              <Bar data={platformChartData} options={chartOptions} />
+            </div>
           </div>
 
           <div className="card posts-card">
@@ -1822,46 +1832,9 @@ function App() {
               </span>
             </div>
 
-            <div className="stat-card">
-              <div className="stat-icon purple">
-                📅
-              </div>
-
-              <div>
-                <span>Scheduled</span>
-                <h2>{scheduledPosts}</h2>
-              </div>
-            </div>
-
-            <br />
-
-            <div className="stat-card">
-              <div className="stat-icon green">
-                🚀
-              </div>
-
-              <div>
-                <span>Published</span>
-                <h2>{publishedPosts}</h2>
-              </div>
-            </div>
-
-            <br />
-
-            <div className="stat-card">
-              <div
-                className="stat-icon"
-                style={{
-                  background: "#fee2e2",
-                }}
-              >
-                ❌
-              </div>
-
-              <div>
-                <span>Failed</span>
-                <h2>{failedPosts}</h2>
-              </div>
+            <div className="analytics-chart analytics-doughnut-chart">
+              <Doughnut data={statusChartData} options={doughnutOptions} />
+              <strong className="chart-center-label">{totalPosts}<small>Total posts</small></strong>
             </div>
           </div>
         </section>
