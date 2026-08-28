@@ -1380,6 +1380,42 @@ body.dark-mode .empty-state h3 {
   min-height: 110px;
 }
 
+.calendar-cell {
+  color: #172033;
+}
+
+.calendar-cell > strong {
+  color: #172033;
+}
+
+.calendar-weekday {
+  color: #64748b !important;
+}
+
+.calendar-post {
+  color: #3730a3 !important;
+}
+
+body.dark-mode .calendar-cell {
+  border-color: #334155 !important;
+  background: #172033 !important;
+  color: #f8fafc !important;
+}
+
+body.dark-mode .calendar-cell.is-empty {
+  background: #111827 !important;
+}
+
+body.dark-mode .calendar-cell > strong,
+body.dark-mode .calendar-weekday {
+  color: #e2e8f0 !important;
+}
+
+body.dark-mode .calendar-post {
+  background: #27304d !important;
+  color: #c7d2fe !important;
+}
+
 /* =====================================================
    FOOTER
 ===================================================== */

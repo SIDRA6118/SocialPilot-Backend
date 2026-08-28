@@ -1609,6 +1609,7 @@ function App() {
         </div>
 
         <div
+          className="calendar-grid"
           style={{
             display: "flex",
             justifyContent: "space-between",
@@ -1655,6 +1656,7 @@ function App() {
             "Sat",
           ].map((day) => (
             <div
+              className="calendar-weekday"
               key={day}
               style={{
                 padding: "10px",
@@ -1674,6 +1676,7 @@ function App() {
 
               return (
                 <div
+                  className={`calendar-cell ${day ? "has-day" : "is-empty"}`}
                   key={index}
                   style={{
                     minHeight: "110px",
@@ -1704,6 +1707,7 @@ function App() {
                         {dayPosts.map(
                           (post) => (
                             <div
+                              className="calendar-post"
                               key={post.id}
                               style={{
                                 padding:
