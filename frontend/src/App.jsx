@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import "./App.css";
 
 const API_URL = "http://127.0.0.1:8000/api/posts/";
@@ -22,43 +22,104 @@ const refreshAccessToken = async () => {
     return false;
   }
 
-  const response = await fetch(REFRESH_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refresh: refreshToken }),
-  });
+  try {
+    const response = await fetch(REFRESH_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        refresh: refreshToken,
+      }),
+    });
 
-  if (!response.ok) {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
+    if (!response.ok) {
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      return false;
+    }
+
+    const data = await response.json();
+
+    if (!data.access) {
+      return false;
+    }
+
+    localStorage.setItem("access_token", data.access);
+
+    return true;
+  } catch (error) {
+    console.error("Token refresh error:", error);
     return false;
   }
-
-  const data = await response.json();
-  localStorage.setItem("access_token", data.access);
-  return true;
 };
 
 const requestWithAuth = async (url, options = {}) => {
   let response = await fetch(url, {
     ...options,
-    headers: getHeaders(),
+    headers: {
+      ...getHeaders(),
+      ...(options.headers || {}),
+    },
   });
 
-  if (response.status === 401 && await refreshAccessToken()) {
+  if (
+    response.status === 401 &&
+    (await refreshAccessToken())
+  ) {
     response = await fetch(url, {
       ...options,
-      headers: getHeaders(),
+      headers: {
+        ...getHeaders(),
+        ...(options.headers || {}),
+      },
     });
   }
 
   return response;
 };
 
+function MessageBox({ message }) {
+  if (!message) {
+    return null;
+  }
+
+  return <div className="message">{message}</div>;
+}
+
 function App() {
+  // =====================================================
+  // STATE
+  // =====================================================
+
   const [posts, setPosts] = useState([]);
+
   const [loading, setLoading] = useState(false);
+
   const [message, setMessage] = useState("");
+
+  const [activePage, setActivePage] = useState("dashboard");
+
+  const [editingPost, setEditingPost] = useState(null);
+
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const [platformFilter, setPlatformFilter] = useState("All");
+
+  const [statusFilter, setStatusFilter] = useState("All");
+
+  const [currentDate, setCurrentDate] = useState(
+    new Date()
+  );
+
+  const [darkMode, setDarkMode] = useState(
+    localStorage.getItem("socialpilot_theme") === "dark"
+  );
+
+  const [notifications, setNotifications] = useState(
+    localStorage.getItem("socialpilot_notifications") !==
+      "false"
+  );
 
   const [form, setForm] = useState({
     content: "",
@@ -73,24 +134,33 @@ function App() {
   const fetchPosts = useCallback(async () => {
     try {
       setLoading(true);
+      setMessage("");
 
       const response = await requestWithAuth(API_URL, {
         method: "GET",
       });
 
-      const data = await response.json();
+      let data = {};
+
+      try {
+        data = await response.json();
+      } catch {
+        data = {};
+      }
 
       console.log("GET /api/posts/ response:", data);
 
       if (!response.ok) {
         if (response.status === 401) {
           throw new Error(
-            "Unauthorized. Your access token is invalid or expired."
+            "Unauthorized. Please login again."
           );
         }
 
         throw new Error(
-          data.detail || data.message || "Failed to fetch posts."
+          data.detail ||
+            data.message ||
+            "Failed to fetch posts."
         );
       }
 
@@ -105,7 +175,8 @@ function App() {
       console.error("Fetch posts error:", error);
 
       setMessage(
-        error.message || "Unable to connect with Django backend."
+        error.message ||
+          "Unable to connect with Django backend."
       );
     } finally {
       setLoading(false);
@@ -113,7 +184,7 @@ function App() {
   }, []);
 
   // =====================================================
-  // LOAD POSTS WHEN APP STARTS
+  // INITIAL LOAD
   // =====================================================
 
   useEffect(() => {
@@ -125,7 +196,20 @@ function App() {
   }, [fetchPosts]);
 
   // =====================================================
-  // HANDLE INPUT
+  // THEME
+  // =====================================================
+
+  useEffect(() => {
+    document.body.classList.toggle("dark-mode", darkMode);
+
+    localStorage.setItem(
+      "socialpilot_theme",
+      darkMode ? "dark" : "light"
+    );
+  }, [darkMode]);
+
+  // =====================================================
+  // FORM CHANGE
   // =====================================================
 
   const handleChange = (e) => {
@@ -138,104 +222,179 @@ function App() {
   };
 
   // =====================================================
-  // CREATE / SCHEDULE POST
+  // RESET FORM
+  // =====================================================
+
+  const resetForm = () => {
+    setForm({
+      content: "",
+      platform: "LinkedIn",
+      scheduled_time: "",
+    });
+
+    setEditingPost(null);
+  };
+
+  // =====================================================
+  // CREATE / UPDATE POST
   // =====================================================
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Clear previous message
     setMessage("");
 
-    // Validate content
     if (!form.content.trim()) {
       setMessage("Please enter post content.");
       return;
     }
 
-    // Validate schedule time
     if (!form.scheduled_time) {
-      setMessage("Please select schedule date and time.");
+      setMessage(
+        "Please select schedule date and time."
+      );
       return;
     }
 
     if (!localStorage.getItem("access_token")) {
-      setMessage("Please login before scheduling a post.");
+      setMessage(
+        "Please login before managing posts."
+      );
       return;
     }
 
     try {
       setLoading(true);
 
-      const response = await requestWithAuth(API_URL, {
-        method: "POST",
-        body: JSON.stringify({
-          content: form.content.trim(),
-          platform: form.platform,
-          scheduled_time: new Date(
-            form.scheduled_time
-          ).toISOString(),
-        }),
-      });
+      const postData = {
+        content: form.content.trim(),
+        platform: form.platform,
+        scheduled_time: new Date(
+          form.scheduled_time
+        ).toISOString(),
+      };
 
-      const data = await response.json();
+      let response;
 
-      console.log("POST /api/posts/ response:", data);
+      if (editingPost) {
+        response = await requestWithAuth(
+          `${API_URL}${editingPost.id}/`,
+          {
+            method: "PATCH",
+            body: JSON.stringify(postData),
+          }
+        );
+      } else {
+        response = await requestWithAuth(API_URL, {
+          method: "POST",
+          body: JSON.stringify(postData),
+        });
+      }
 
-      // =================================================
-      // HANDLE ERROR
-      // =================================================
+      let data = {};
+
+      try {
+        data = await response.json();
+      } catch {
+        data = {};
+      }
+
+      console.log("Post API response:", data);
 
       if (!response.ok) {
         if (response.status === 401) {
           throw new Error(
-            "401 Unauthorized: Access token is invalid or expired."
+            "401 Unauthorized: Please login again."
           );
         }
 
         if (response.status === 400) {
-          console.error("Validation error:", data);
-
           throw new Error(
             data.detail ||
               data.message ||
-              "Invalid post data. Check the required fields."
+              "Invalid post data."
           );
         }
 
         throw new Error(
           data.detail ||
             data.message ||
-            "Post creation failed."
+            "Post operation failed."
         );
       }
 
-      // =================================================
-      // SUCCESS
-      // =================================================
+      if (editingPost) {
+        setMessage(
+          "Post updated successfully! ✨"
+        );
+      } else {
+        setMessage(
+          "Post scheduled successfully! 🎉"
+        );
+      }
 
-      console.log("Post created successfully:", data);
+      resetForm();
 
-      setMessage("Post scheduled successfully! 🎉");
-
-      // Clear form
-      setForm({
-        content: "",
-        platform: "LinkedIn",
-        scheduled_time: "",
-      });
-
-      // Reload posts
       await fetchPosts();
+
+      setActivePage("posts");
     } catch (error) {
-      console.error("Post creation error:", error);
+      console.error("Post operation error:", error);
 
       setMessage(
-        error.message || "Failed to schedule post."
+        error.message ||
+          "Failed to save the post."
       );
     } finally {
       setLoading(false);
     }
+  };
+
+  // =====================================================
+  // EDIT POST
+  // =====================================================
+
+  const startEdit = (post) => {
+    setEditingPost(post);
+
+    let formattedDate = "";
+
+    if (post.scheduled_time) {
+      const date = new Date(post.scheduled_time);
+
+      const year = date.getFullYear();
+
+      const month = String(
+        date.getMonth() + 1
+      ).padStart(2, "0");
+
+      const day = String(
+        date.getDate()
+      ).padStart(2, "0");
+
+      const hours = String(
+        date.getHours()
+      ).padStart(2, "0");
+
+      const minutes = String(
+        date.getMinutes()
+      ).padStart(2, "0");
+
+      formattedDate = `${year}-${month}-${day}T${hours}:${minutes}`;
+    }
+
+    setForm({
+      content: post.content || "",
+      platform: post.platform || "LinkedIn",
+      scheduled_time: formattedDate,
+    });
+
+    setActivePage("dashboard");
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
   };
 
   // =====================================================
@@ -255,23 +414,25 @@ function App() {
       setLoading(true);
       setMessage("");
 
-      const response = await requestWithAuth(`${API_URL}${id}/`, {
-        method: "DELETE",
-      });
+      const response = await requestWithAuth(
+        `${API_URL}${id}/`,
+        {
+          method: "DELETE",
+        }
+      );
 
-      // DELETE may return 204 No Content
       if (!response.ok) {
         let data = {};
 
         try {
           data = await response.json();
         } catch {
-          // Response may have no JSON body
+          data = {};
         }
 
         if (response.status === 401) {
           throw new Error(
-            "401 Unauthorized: Access token is invalid or expired."
+            "Unauthorized. Please login again."
           );
         }
 
@@ -282,18 +443,42 @@ function App() {
         );
       }
 
-      setMessage("Post deleted successfully. 🗑️");
+      setMessage(
+        "Post deleted successfully. 🗑️"
+      );
 
       await fetchPosts();
     } catch (error) {
-      console.error("Delete post error:", error);
+      console.error("Delete error:", error);
 
       setMessage(
-        error.message || "Unable to delete post."
+        error.message ||
+          "Unable to delete post."
       );
     } finally {
       setLoading(false);
     }
+  };
+
+  // =====================================================
+  // LOGOUT
+  // =====================================================
+
+  const handleLogout = () => {
+    const confirmed = window.confirm(
+      "Are you sure you want to logout?"
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+
+    setMessage("Logged out successfully.");
+
+    window.location.reload();
   };
 
   // =====================================================
@@ -304,133 +489,286 @@ function App() {
 
   const scheduledPosts = posts.filter(
     (post) =>
-      post.status?.toLowerCase() === "scheduled" ||
-      !post.status
+      (post.status || "scheduled").toLowerCase() ===
+      "scheduled"
   ).length;
 
   const publishedPosts = posts.filter(
     (post) =>
-      post.status?.toLowerCase() === "published"
+      (post.status || "").toLowerCase() ===
+      "published"
+  ).length;
+
+  const failedPosts = posts.filter(
+    (post) =>
+      (post.status || "").toLowerCase() ===
+      "failed"
   ).length;
 
   // =====================================================
-  // UI
+  // PLATFORM STATISTICS
   // =====================================================
 
-  return (
-    <div className="app">
+  const platformStats = useMemo(() => {
+    const stats = {
+      LinkedIn: 0,
+      Twitter: 0,
+      Facebook: 0,
+      Instagram: 0,
+    };
 
-      {/* =================================================
-          SIDEBAR
-      ================================================= */}
+    posts.forEach((post) => {
+      const platform = post.platform;
 
-      <aside className="sidebar">
+      if (stats[platform] !== undefined) {
+        stats[platform]++;
+      }
+    });
 
-        <div className="logo">
-          <div className="logo-icon">S</div>
+    return stats;
+  }, [posts]);
 
-          <div>
-            <h2>SocialPilot</h2>
-            <span>Smart Social Manager</span>
-          </div>
+  // =====================================================
+  // FILTERED POSTS
+  // =====================================================
+
+  const filteredPosts = useMemo(() => {
+    return posts.filter((post) => {
+      const matchesSearch =
+        !searchTerm ||
+        post.content
+          ?.toLowerCase()
+          .includes(searchTerm.toLowerCase());
+
+      const matchesPlatform =
+        platformFilter === "All" ||
+        post.platform === platformFilter;
+
+      const postStatus =
+        post.status || "scheduled";
+
+      const matchesStatus =
+        statusFilter === "All" ||
+        postStatus.toLowerCase() ===
+          statusFilter.toLowerCase();
+
+      return (
+        matchesSearch &&
+        matchesPlatform &&
+        matchesStatus
+      );
+    });
+  }, [
+    posts,
+    searchTerm,
+    platformFilter,
+    statusFilter,
+  ]);
+
+  // =====================================================
+  // CALENDAR HELPERS
+  // =====================================================
+
+  const calendarData = useMemo(() => {
+    const year = currentDate.getFullYear();
+
+    const month = currentDate.getMonth();
+
+    const firstDay = new Date(
+      year,
+      month,
+      1
+    ).getDay();
+
+    const daysInMonth = new Date(
+      year,
+      month + 1,
+      0
+    ).getDate();
+
+    const cells = [];
+
+    for (let i = 0; i < firstDay; i++) {
+      cells.push(null);
+    }
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      cells.push(day);
+    }
+
+    return cells;
+  }, [currentDate]);
+
+  const getPostsForDay = (day) => {
+    if (!day) {
+      return [];
+    }
+
+    const year = currentDate.getFullYear();
+
+    const month = currentDate.getMonth();
+
+    return posts.filter((post) => {
+      if (!post.scheduled_time) {
+        return false;
+      }
+
+      const date = new Date(
+        post.scheduled_time
+      );
+
+      return (
+        date.getFullYear() === year &&
+        date.getMonth() === month &&
+        date.getDate() === day
+      );
+    });
+  };
+
+  const previousMonth = () => {
+    setCurrentDate(
+      new Date(
+        currentDate.getFullYear(),
+        currentDate.getMonth() - 1,
+        1
+      )
+    );
+  };
+
+  const nextMonth = () => {
+    setCurrentDate(
+      new Date(
+        currentDate.getFullYear(),
+        currentDate.getMonth() + 1,
+        1
+      )
+    );
+  };
+
+  const goToToday = () => {
+    setCurrentDate(new Date());
+  };
+
+  // =====================================================
+  // PAGE HEADER
+  // =====================================================
+
+  const pageTitle = {
+    dashboard: "Dashboard",
+    posts: "Posts",
+    calendar: "Calendar",
+    analytics: "Analytics",
+    settings: "Settings",
+  };
+
+  const pageDescription = {
+    dashboard:
+      "Manage and schedule your social media content",
+    posts:
+      "View, search, edit and manage all your posts",
+    calendar:
+      "View your scheduled content by date",
+    analytics:
+      "Track your social media scheduling performance",
+    settings:
+      "Manage your SocialPilot preferences",
+  };
+
+  // =====================================================
+  // PLATFORM ICON
+  // =====================================================
+
+  const getPlatformIcon = (platform) => {
+    switch (platform?.toLowerCase()) {
+      case "linkedin":
+        return "in";
+
+      case "twitter":
+        return "𝕏";
+
+      case "instagram":
+        return "◎";
+
+      case "facebook":
+        return "f";
+
+      default:
+        return "📱";
+    }
+  };
+
+  // =====================================================
+  // POST ITEM
+  // =====================================================
+
+  const PostItem = ({ post }) => {
+    return (
+      <div className="post-item">
+        <div className="platform-icon">
+          {getPlatformIcon(post.platform)}
         </div>
 
-        <nav>
+        <div className="post-content">
+          <div className="post-top">
+            <strong>
+              {post.platform || "Social Media"}
+            </strong>
 
-          <a className="active">
-            <span>📊</span>
-            Dashboard
-          </a>
-
-          <a>
-            <span>📝</span>
-            Posts
-          </a>
-
-          <a>
-            <span>📅</span>
-            Calendar
-          </a>
-
-          <a>
-            <span>📈</span>
-            Analytics
-          </a>
-
-          <a>
-            <span>⚙️</span>
-            Settings
-          </a>
-
-        </nav>
-
-        <div className="sidebar-bottom">
-
-          <div className="profile">
-
-            <div className="avatar">
-              SK
-            </div>
-
-            <div>
-              <strong>Social Admin</strong>
-              <small>Admin</small>
-            </div>
-
+            <span
+              className={`status ${
+                (
+                  post.status || "scheduled"
+                ).toLowerCase()
+              }`}
+            >
+              {post.status || "Scheduled"}
+            </span>
           </div>
 
+          <p>{post.content}</p>
+
+          <small>
+            📅{" "}
+            {post.scheduled_time
+              ? new Date(
+                  post.scheduled_time
+                ).toLocaleString()
+              : "No schedule time"}
+          </small>
         </div>
 
-      </aside>
+        <button
+          type="button"
+          className="delete-btn"
+          onClick={() => startEdit(post)}
+          title="Edit post"
+        >
+          ✏️
+        </button>
 
-      {/* =================================================
-          MAIN
-      ================================================= */}
+        <button
+          type="button"
+          className="delete-btn"
+          onClick={() => deletePost(post.id)}
+          title="Delete post"
+        >
+          🗑️
+        </button>
+      </div>
+    );
+  };
 
-      <main className="main">
+  // =====================================================
+  // DASHBOARD PAGE
+  // =====================================================
 
-        {/* =================================================
-            HEADER
-        ================================================= */}
-
-        <header className="topbar">
-
-          <div>
-            <h1>Dashboard</h1>
-
-            <p>
-              Manage and schedule your social media content
-            </p>
-          </div>
-
-          <button
-            className="refresh-btn"
-            onClick={fetchPosts}
-            disabled={loading}
-          >
-            🔄 Refresh
-          </button>
-
-        </header>
-
-        {/* =================================================
-            MESSAGE
-        ================================================= */}
-
-        {message && (
-          <div className="message">
-            {message}
-          </div>
-        )}
-
-        {/* =================================================
-            STATISTICS
-        ================================================= */}
+  const DashboardPage = () => {
+    return (
+      <>
+        {/* STATISTICS */}
 
         <section className="stats">
-
           <div className="stat-card">
-
             <div className="stat-icon blue">
               📝
             </div>
@@ -439,11 +777,9 @@ function App() {
               <span>Total Posts</span>
               <h2>{totalPosts}</h2>
             </div>
-
           </div>
 
           <div className="stat-card">
-
             <div className="stat-icon purple">
               📅
             </div>
@@ -452,11 +788,9 @@ function App() {
               <span>Scheduled</span>
               <h2>{scheduledPosts}</h2>
             </div>
-
           </div>
 
           <div className="stat-card">
-
             <div className="stat-icon green">
               🚀
             </div>
@@ -465,44 +799,36 @@ function App() {
               <span>Published</span>
               <h2>{publishedPosts}</h2>
             </div>
-
           </div>
-
         </section>
 
-        {/* =================================================
-            CONTENT GRID
-        ================================================= */}
+        {/* DASHBOARD GRID */}
 
         <section className="dashboard-grid">
-
-          {/* =================================================
-              CREATE POST
-          ================================================= */}
+          {/* CREATE POST */}
 
           <div className="card create-card">
-
             <div className="card-header">
-
               <div>
-
-                <h2>Create New Post</h2>
+                <h2>
+                  {editingPost
+                    ? "Edit Post"
+                    : "Create New Post"}
+                </h2>
 
                 <p>
-                  Create and schedule your next social media
-                  post.
+                  {editingPost
+                    ? "Update your scheduled social media post."
+                    : "Create and schedule your next social media post."}
                 </p>
-
               </div>
 
               <span className="header-icon">
-                ✏️
+                {editingPost ? "✏️" : "📝"}
               </span>
-
             </div>
 
             <form onSubmit={handleSubmit}>
-
               <label htmlFor="content">
                 Post Content
               </label>
@@ -517,9 +843,7 @@ function App() {
               />
 
               <div className="form-row">
-
                 <div className="form-group">
-
                   <label htmlFor="platform">
                     Platform
                   </label>
@@ -530,7 +854,6 @@ function App() {
                     value={form.platform}
                     onChange={handleChange}
                   >
-
                     <option value="LinkedIn">
                       LinkedIn
                     </option>
@@ -546,13 +869,10 @@ function App() {
                     <option value="Instagram">
                       Instagram
                     </option>
-
                   </select>
-
                 </div>
 
                 <div className="form-group">
-
                   <label htmlFor="scheduled_time">
                     Schedule Time
                   </label>
@@ -564,9 +884,7 @@ function App() {
                     value={form.scheduled_time}
                     onChange={handleChange}
                   />
-
                 </div>
-
               </div>
 
               <button
@@ -574,57 +892,62 @@ function App() {
                 className="schedule-btn"
                 disabled={loading}
               >
-
                 {loading
-                  ? "Scheduling..."
+                  ? "Saving..."
+                  : editingPost
+                  ? "✏️ Update Post"
                   : "📅 Schedule Post"}
-
               </button>
 
+              {editingPost && (
+                <button
+                  type="button"
+                  className="refresh-btn"
+                  style={{
+                    width: "100%",
+                    marginTop: "10px",
+                  }}
+                  onClick={resetForm}
+                >
+                  Cancel Edit
+                </button>
+              )}
             </form>
-
           </div>
 
-          {/* =================================================
-              QUICK ACTIONS
-          ================================================= */}
+          {/* QUICK ACTIONS */}
 
           <div className="card quick-card">
-
             <div className="card-header">
-
               <div>
-
                 <h2>Quick Actions</h2>
 
                 <p>
                   Manage your social media workflow.
                 </p>
-
               </div>
-
             </div>
 
             <div className="quick-actions">
-
               <button
                 type="button"
-                onClick={() =>
+                onClick={() => {
+                  resetForm();
+
                   document
                     .querySelector("textarea")
-                    ?.focus()
-                }
+                    ?.focus();
+                }}
               >
-
                 <span>➕</span>
 
                 <div>
                   <strong>Create Post</strong>
+
                   <small>
                     Write a new social post
                   </small>
                 </div>
-
               </button>
 
               <button
@@ -632,220 +955,1056 @@ function App() {
                 onClick={fetchPosts}
                 disabled={loading}
               >
-
                 <span>🔄</span>
 
                 <div>
                   <strong>Refresh Posts</strong>
+
                   <small>
                     Load latest posts
                   </small>
                 </div>
-
               </button>
 
-              <button type="button">
+              <button
+                type="button"
+                onClick={() =>
+                  setActivePage("calendar")
+                }
+              >
+                <span>📅</span>
 
+                <div>
+                  <strong>View Calendar</strong>
+
+                  <small>
+                    Check scheduled content
+                  </small>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setActivePage("analytics")
+                }
+              >
                 <span>📊</span>
 
                 <div>
                   <strong>View Analytics</strong>
+
                   <small>
                     Check your performance
                   </small>
                 </div>
-
               </button>
-
-              <button type="button">
-
-                <span>⚙️</span>
-
-                <div>
-                  <strong>Settings</strong>
-                  <small>
-                    Configure SocialPilot
-                  </small>
-                </div>
-
-              </button>
-
             </div>
-
           </div>
-
         </section>
 
-        {/* =================================================
-            RECENT POSTS
-        ================================================= */}
+        {/* RECENT POSTS */}
 
         <section className="card posts-card">
-
           <div className="card-header posts-header">
-
             <div>
-
               <h2>Recent Posts</h2>
 
               <p>
                 Your latest scheduled and published posts.
               </p>
-
             </div>
 
             <span className="post-count">
               {posts.length} Posts
             </span>
-
           </div>
 
-          {/* =================================================
-              LOADING
-          ================================================= */}
-
           {loading && posts.length === 0 ? (
-
             <div className="empty-state">
-
               <div className="loader"></div>
 
-              <p>
-                Loading posts...
-              </p>
-
+              <p>Loading posts...</p>
             </div>
-
           ) : posts.length === 0 ? (
-
-            /* =================================================
-               EMPTY
-            ================================================= */
-
             <div className="empty-state">
-
               <div className="empty-icon">
                 📝
               </div>
 
-              <h3>
-                No posts yet
-              </h3>
+              <h3>No posts yet</h3>
 
               <p>
                 Create your first social media post above.
               </p>
-
             </div>
-
           ) : (
-
-            /* =================================================
-               POSTS LIST
-            ================================================= */
-
             <div className="posts-list">
-
-              {posts.map((post) => (
-
-                <div
-                  className="post-item"
-                  key={post.id}
-                >
-
-                  <div className="platform-icon">
-
-                    {post.platform?.toLowerCase() ===
-                    "linkedin"
-                      ? "in"
-                      : post.platform?.toLowerCase() ===
-                        "twitter"
-                      ? "𝕏"
-                      : post.platform?.toLowerCase() ===
-                        "instagram"
-                      ? "◎"
-                      : "f"}
-
-                  </div>
-
-                  <div className="post-content">
-
-                    <div className="post-top">
-
-                      <strong>
-                        {post.platform ||
-                          "Social Media"}
-                      </strong>
-
-                      <span
-                        className={`status ${
-                          post.status
-                            ? post.status.toLowerCase()
-                            : "scheduled"
-                        }`}
-                      >
-
-                        {post.status ||
-                          "Scheduled"}
-
-                      </span>
-
-                    </div>
-
-                    <p>
-                      {post.content}
-                    </p>
-
-                    <small>
-
-                      📅{" "}
-
-                      {post.scheduled_time
-                        ? new Date(
-                            post.scheduled_time
-                          ).toLocaleString()
-                        : "No schedule time"}
-
-                    </small>
-
-                  </div>
-
-                  <button
-                    type="button"
-                    className="delete-btn"
-                    onClick={() =>
-                      deletePost(post.id)
-                    }
-                    title="Delete post"
-                  >
-                    🗑️
-                  </button>
-
-                </div>
-
-              ))}
-
+              {posts
+                .slice()
+                .sort(
+                  (a, b) =>
+                    new Date(
+                      b.created_at ||
+                        b.scheduled_time
+                    ) -
+                    new Date(
+                      a.created_at ||
+                        a.scheduled_time
+                    )
+                )
+                .slice(0, 5)
+                .map((post) => (
+                  <PostItem
+                    key={post.id}
+                    post={post}
+                  />
+                ))}
             </div>
-
           )}
 
+          {posts.length > 5 && (
+            <button
+              type="button"
+              className="refresh-btn"
+              style={{
+                width: "100%",
+                marginTop: "15px",
+              }}
+              onClick={() =>
+                setActivePage("posts")
+              }
+            >
+              View All Posts →
+            </button>
+          )}
+        </section>
+      </>
+    );
+  };
+
+  // =====================================================
+  // POSTS PAGE
+  // =====================================================
+
+  const PostsPage = () => {
+    return (
+      <section className="card posts-card">
+        <div className="card-header posts-header">
+          <div>
+            <h2>All Posts</h2>
+
+            <p>
+              Search and manage all your social media posts.
+            </p>
+          </div>
+
+          <span className="post-count">
+            {filteredPosts.length} Posts
+          </span>
+        </div>
+
+        {/* FILTERS */}
+
+        <div
+          className="form-row"
+          style={{
+            marginBottom: "20px",
+          }}
+        >
+          <div className="form-group">
+            <label>Search</label>
+
+            <input
+              type="text"
+              placeholder="Search post content..."
+              value={searchTerm}
+              onChange={(e) =>
+                setSearchTerm(e.target.value)
+              }
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Platform</label>
+
+            <select
+              value={platformFilter}
+              onChange={(e) =>
+                setPlatformFilter(e.target.value)
+              }
+            >
+              <option value="All">All Platforms</option>
+              <option value="LinkedIn">LinkedIn</option>
+              <option value="Twitter">Twitter</option>
+              <option value="Facebook">Facebook</option>
+              <option value="Instagram">
+                Instagram
+              </option>
+            </select>
+          </div>
+        </div>
+
+        <div
+          className="form-group"
+          style={{
+            marginBottom: "20px",
+          }}
+        >
+          <label>Status</label>
+
+          <select
+            value={statusFilter}
+            onChange={(e) =>
+              setStatusFilter(e.target.value)
+            }
+          >
+            <option value="All">All Statuses</option>
+            <option value="scheduled">
+              Scheduled
+            </option>
+            <option value="published">
+              Published
+            </option>
+            <option value="failed">Failed</option>
+          </select>
+        </div>
+
+        {/* POSTS */}
+
+        {filteredPosts.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-icon">
+              🔍
+            </div>
+
+            <h3>No posts found</h3>
+
+            <p>
+              Try changing your search or filters.
+            </p>
+          </div>
+        ) : (
+          <div className="posts-list">
+            {filteredPosts.map((post) => (
+              <PostItem
+                key={post.id}
+                post={post}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+    );
+  };
+
+  // =====================================================
+  // CALENDAR PAGE
+  // =====================================================
+
+  const CalendarPage = () => {
+    const monthName =
+      currentDate.toLocaleString("default", {
+        month: "long",
+      });
+
+    const year =
+      currentDate.getFullYear();
+
+    return (
+      <section className="card posts-card">
+        <div className="card-header posts-header">
+          <div>
+            <h2>
+              {monthName} {year}
+            </h2>
+
+            <p>
+              Your scheduled social media content.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            className="refresh-btn"
+            onClick={goToToday}
+          >
+            Today
+          </button>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "20px",
+          }}
+        >
+          <button
+            type="button"
+            className="refresh-btn"
+            onClick={previousMonth}
+          >
+            ← Previous
+          </button>
+
+          <strong>
+            {monthName} {year}
+          </strong>
+
+          <button
+            type="button"
+            className="refresh-btn"
+            onClick={nextMonth}
+          >
+            Next →
+          </button>
+        </div>
+
+        {/* CALENDAR */}
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns:
+              "repeat(7, 1fr)",
+            gap: "8px",
+          }}
+        >
+          {[
+            "Sun",
+            "Mon",
+            "Tue",
+            "Wed",
+            "Thu",
+            "Fri",
+            "Sat",
+          ].map((day) => (
+            <div
+              key={day}
+              style={{
+                padding: "10px",
+                textAlign: "center",
+                fontWeight: "700",
+                color: "#64748b",
+              }}
+            >
+              {day}
+            </div>
+          ))}
+
+          {calendarData.map(
+            (day, index) => {
+              const dayPosts =
+                getPostsForDay(day);
+
+              return (
+                <div
+                  key={index}
+                  style={{
+                    minHeight: "110px",
+                    padding: "8px",
+                    border:
+                      "1px solid #e3e7ee",
+                    borderRadius: "10px",
+                    background: day
+                      ? "#ffffff"
+                      : "#f8fafc",
+                  }}
+                >
+                  {day && (
+                    <>
+                      <strong>
+                        {day}
+                      </strong>
+
+                      <div
+                        style={{
+                          marginTop: "7px",
+                          display: "flex",
+                          flexDirection:
+                            "column",
+                          gap: "5px",
+                        }}
+                      >
+                        {dayPosts.map(
+                          (post) => (
+                            <div
+                              key={post.id}
+                              style={{
+                                padding:
+                                  "5px 7px",
+                                borderRadius:
+                                  "6px",
+                                background:
+                                  "#eef2ff",
+                                color:
+                                  "#3730a3",
+                                fontSize:
+                                  "10px",
+                                cursor:
+                                  "pointer",
+                              }}
+                              title={
+                                post.content
+                              }
+                              onClick={() =>
+                                startEdit(
+                                  post
+                                )
+                              }
+                            >
+                              <strong>
+                                {
+                                  post.platform
+                                }
+                              </strong>
+
+                              <br />
+
+                              {new Date(
+                                post.scheduled_time
+                              ).toLocaleTimeString(
+                                [],
+                                {
+                                  hour: "2-digit",
+                                  minute:
+                                    "2-digit",
+                                }
+                              )}
+                            </div>
+                          )
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            }
+          )}
+        </div>
+      </section>
+    );
+  };
+
+  // =====================================================
+  // ANALYTICS PAGE
+  // =====================================================
+
+  const AnalyticsPage = () => {
+    return (
+      <>
+        <section className="stats">
+          <div className="stat-card">
+            <div className="stat-icon blue">
+              📝
+            </div>
+
+            <div>
+              <span>Total Posts</span>
+              <h2>{totalPosts}</h2>
+            </div>
+          </div>
+
+          <div className="stat-card">
+            <div className="stat-icon purple">
+              📅
+            </div>
+
+            <div>
+              <span>Scheduled</span>
+              <h2>{scheduledPosts}</h2>
+            </div>
+          </div>
+
+          <div className="stat-card">
+            <div className="stat-icon green">
+              🚀
+            </div>
+
+            <div>
+              <span>Published</span>
+              <h2>{publishedPosts}</h2>
+            </div>
+          </div>
         </section>
 
-        {/* =================================================
-            FOOTER
-        ================================================= */}
+        {/* PLATFORM ANALYTICS */}
+
+        <section className="dashboard-grid">
+          <div className="card posts-card">
+            <div className="card-header">
+              <div>
+                <h2>Platform Performance</h2>
+
+                <p>
+                  Number of posts scheduled for each platform.
+                </p>
+              </div>
+
+              <span className="header-icon">
+                📊
+              </span>
+            </div>
+
+            {Object.entries(
+              platformStats
+            ).map(([platform, count]) => {
+              const percentage =
+                totalPosts > 0
+                  ? Math.round(
+                      (count /
+                        totalPosts) *
+                        100
+                    )
+                  : 0;
+
+              return (
+                <div
+                  key={platform}
+                  style={{
+                    marginBottom: "18px",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent:
+                        "space-between",
+                      marginBottom: "7px",
+                    }}
+                  >
+                    <strong>
+                      {platform}
+                    </strong>
+
+                    <span>
+                      {count} posts
+                    </span>
+                  </div>
+
+                  <div
+                    style={{
+                      width: "100%",
+                      height: "9px",
+                      borderRadius: "10px",
+                      background:
+                        "#e5e7eb",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: `${percentage}%`,
+                        height: "100%",
+                        borderRadius:
+                          "10px",
+                        background:
+                          "linear-gradient(135deg, #4f46e5, #7c3aed)",
+                      }}
+                    />
+                  </div>
+
+                  <small
+                    style={{
+                      color: "#64748b",
+                    }}
+                  >
+                    {percentage}% of total
+                    posts
+                  </small>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* STATUS */}
+
+          <div className="card posts-card">
+            <div className="card-header">
+              <div>
+                <h2>Post Status</h2>
+
+                <p>
+                  Current status breakdown.
+                </p>
+              </div>
+
+              <span className="header-icon">
+                📈
+              </span>
+            </div>
+
+            <div className="stat-card">
+              <div className="stat-icon purple">
+                📅
+              </div>
+
+              <div>
+                <span>Scheduled</span>
+                <h2>{scheduledPosts}</h2>
+              </div>
+            </div>
+
+            <br />
+
+            <div className="stat-card">
+              <div className="stat-icon green">
+                🚀
+              </div>
+
+              <div>
+                <span>Published</span>
+                <h2>{publishedPosts}</h2>
+              </div>
+            </div>
+
+            <br />
+
+            <div className="stat-card">
+              <div
+                className="stat-icon"
+                style={{
+                  background: "#fee2e2",
+                }}
+              >
+                ❌
+              </div>
+
+              <div>
+                <span>Failed</span>
+                <h2>{failedPosts}</h2>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* PLATFORM TABLE */}
+
+        <section className="card posts-card">
+          <div className="card-header">
+            <div>
+              <h2>Platform Summary</h2>
+
+              <p>
+                Complete platform-wise post statistics.
+              </p>
+            </div>
+          </div>
+
+          <div className="posts-list">
+            {Object.entries(
+              platformStats
+            ).map(([platform, count]) => (
+              <div
+                className="post-item"
+                key={platform}
+              >
+                <div className="platform-icon">
+                  {getPlatformIcon(
+                    platform
+                  )}
+                </div>
+
+                <div className="post-content">
+                  <strong>
+                    {platform}
+                  </strong>
+
+                  <p>
+                    {count} post
+                    {count !== 1
+                      ? "s"
+                      : ""}{" "}
+                    scheduled
+                  </p>
+                </div>
+
+                <span className="post-count">
+                  {count}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      </>
+    );
+  };
+
+  // =====================================================
+  // SETTINGS PAGE
+  // =====================================================
+
+  const SettingsPage = () => {
+    const username =
+      localStorage.getItem("username") ||
+      "Social Admin";
+
+    const email =
+      localStorage.getItem("email") ||
+      "Admin Account";
+
+    const savePreferences = () => {
+      localStorage.setItem(
+        "socialpilot_notifications",
+        notifications ? "true" : "false"
+      );
+
+      setMessage(
+        "Settings saved successfully! ⚙️"
+      );
+    };
+
+    return (
+      <section className="card create-card">
+        <div className="card-header">
+          <div>
+            <h2>Settings</h2>
+
+            <p>
+              Manage your SocialPilot account and preferences.
+            </p>
+          </div>
+
+          <span className="header-icon">
+            ⚙️
+          </span>
+        </div>
+
+        {/* PROFILE */}
+
+        <div
+          style={{
+            padding: "18px",
+            border:
+              "1px solid #e7ebf1",
+            borderRadius: "12px",
+            marginBottom: "20px",
+          }}
+        >
+          <h3
+            style={{
+              marginBottom: "15px",
+            }}
+          >
+            Profile
+          </h3>
+
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "15px",
+            }}
+          >
+            <div className="avatar">
+              SK
+            </div>
+
+            <div>
+              <strong>
+                {username}
+              </strong>
+
+              <small
+                style={{
+                  display: "block",
+                  color: "#64748b",
+                  marginTop: "4px",
+                }}
+              >
+                {email}
+              </small>
+            </div>
+          </div>
+        </div>
+
+        {/* PREFERENCES */}
+
+        <div
+          style={{
+            padding: "18px",
+            border:
+              "1px solid #e7ebf1",
+            borderRadius: "12px",
+            marginBottom: "20px",
+          }}
+        >
+          <h3
+            style={{
+              marginBottom: "15px",
+            }}
+          >
+            Preferences
+          </h3>
+
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              marginBottom: "15px",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={notifications}
+              onChange={(e) =>
+                setNotifications(
+                  e.target.checked
+                )
+              }
+              style={{
+                width: "auto",
+              }}
+            />
+
+            Enable notifications
+          </label>
+
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={darkMode}
+              onChange={(e) =>
+                setDarkMode(
+                  e.target.checked
+                )
+              }
+              style={{
+                width: "auto",
+              }}
+            />
+
+            Dark mode
+          </label>
+        </div>
+
+        <button
+          type="button"
+          className="schedule-btn"
+          onClick={savePreferences}
+        >
+          💾 Save Settings
+        </button>
+
+        <button
+          type="button"
+          className="refresh-btn"
+          style={{
+            width: "100%",
+            marginTop: "12px",
+            color: "#dc2626",
+          }}
+          onClick={handleLogout}
+        >
+          🚪 Logout
+        </button>
+      </section>
+    );
+  };
+
+  // =====================================================
+  // MAIN PAGE CONTENT
+  // =====================================================
+
+  const renderPage = () => {
+    switch (activePage) {
+      case "posts":
+        return <PostsPage />;
+
+      case "calendar":
+        return <CalendarPage />;
+
+      case "analytics":
+        return <AnalyticsPage />;
+
+      case "settings":
+        return <SettingsPage />;
+
+      case "dashboard":
+      default:
+        return <DashboardPage />;
+    }
+  };
+
+  // =====================================================
+  // UI
+  // =====================================================
+
+  return (
+    <div className="app">
+      {/* =================================================
+          SIDEBAR
+      ================================================= */}
+
+      <aside className="sidebar">
+        <div className="logo">
+          <div className="logo-icon">
+            S
+          </div>
+
+          <div>
+            <h2>SocialPilot</h2>
+
+            <span>
+              Smart Social Manager
+            </span>
+          </div>
+        </div>
+
+        <nav>
+          <a
+            href="#"
+            className={
+              activePage === "dashboard"
+                ? "active"
+                : ""
+            }
+            onClick={(e) => {
+              e.preventDefault();
+              setActivePage("dashboard");
+            }}
+          >
+            <span>📊</span>
+            Dashboard
+          </a>
+
+          <a
+            href="#"
+            className={
+              activePage === "posts"
+                ? "active"
+                : ""
+            }
+            onClick={(e) => {
+              e.preventDefault();
+              setActivePage("posts");
+            }}
+          >
+            <span>📝</span>
+            Posts
+          </a>
+
+          <a
+            href="#"
+            className={
+              activePage === "calendar"
+                ? "active"
+                : ""
+            }
+            onClick={(e) => {
+              e.preventDefault();
+              setActivePage("calendar");
+            }}
+          >
+            <span>📅</span>
+            Calendar
+          </a>
+
+          <a
+            href="#"
+            className={
+              activePage === "analytics"
+                ? "active"
+                : ""
+            }
+            onClick={(e) => {
+              e.preventDefault();
+              setActivePage("analytics");
+            }}
+          >
+            <span>📈</span>
+            Analytics
+          </a>
+
+          <a
+            href="#"
+            className={
+              activePage === "settings"
+                ? "active"
+                : ""
+            }
+            onClick={(e) => {
+              e.preventDefault();
+              setActivePage("settings");
+            }}
+          >
+            <span>⚙️</span>
+            Settings
+          </a>
+        </nav>
+
+        <div className="sidebar-bottom">
+          <div className="profile">
+            <div className="avatar">
+              SK
+            </div>
+
+            <div>
+              <strong>
+                Social Admin
+              </strong>
+
+              <small>
+                Admin
+              </small>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* =================================================
+          MAIN
+      ================================================= */}
+
+      <main className="main">
+        {/* HEADER */}
+
+        <header className="topbar">
+          <div>
+            <h1>
+              {pageTitle[activePage]}
+            </h1>
+
+            <p>
+              {pageDescription[activePage]}
+            </p>
+          </div>
+
+          <button
+            className="refresh-btn"
+            onClick={fetchPosts}
+            disabled={loading}
+          >
+            🔄 Refresh
+          </button>
+        </header>
+
+        {/* MESSAGE */}
+
+        <MessageBox message={message} />
+
+        {/* PAGE */}
+
+        {renderPage()}
+
+        {/* FOOTER */}
 
         <footer>
-
           <p>
-            © 2026 SocialPilot • Intelligent Social Media
-            Scheduling Platform
+            © 2026 SocialPilot • Intelligent
+            Social Media Scheduling Platform
           </p>
-
         </footer>
-
       </main>
-
     </div>
   );
 }
