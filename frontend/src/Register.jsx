@@ -73,8 +73,8 @@ function Register({ onRegister, onBackToLogin }) {
           <span className="auth-kicker">BUILD YOUR MOMENTUM</span>
           <h1>Your next great campaign starts here.</h1>
           <p>
-            Bring your channels together, keep your voice consistent, and make
-            every post count.
+            Bring your channels together, keep your voice consistent, and
+            make every post count.
           </p>
         </div>
 
@@ -89,7 +89,7 @@ function Register({ onRegister, onBackToLogin }) {
           <div className="auth-heading">
             <span className="auth-eyebrow">GET STARTED</span>
             <h2>Create your workspace</h2>
-            <p>Set up your account and start planning with clarity.</p>
+            <p>Set up your workspace and start planning with clarity.</p>
           </div>
 
           <form className="auth-form" onSubmit={handleRegister}>
@@ -144,7 +144,7 @@ function Register({ onRegister, onBackToLogin }) {
           </form>
 
           <p className="auth-switch">
-            Already have an account?{" "}
+              Already have a SocialPilot workspace?{" "}
             <button type="button" onClick={onBackToLogin}>
               Sign in
             </button>

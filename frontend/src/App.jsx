@@ -215,11 +215,11 @@ function LivePostPreview({ form, profile }) {
           <div><strong>{profile.username}</strong><small>{form.platform} · {previewDate}</small></div>
           <b>•••</b>
         </div>
-        <p className="social-preview-content">{form.content || "Your post content will appear here..."}</p>
+        <p className="social-preview-content">{form.content || "Your post preview will appear here..."}</p>
         {form.media_url ? (
           <img className="social-preview-media" src={form.media_url} alt="Post media preview" onError={(event) => { event.currentTarget.style.display = "none"; }} />
         ) : (
-          <div className="social-preview-placeholder"><span>＋</span><small>Add a media URL to preview your visual</small></div>
+          <div className="social-preview-placeholder"><span>＋</span><small>Add a media URL to preview your creative</small></div>
         )}
         <div className="social-preview-actions"><span>♡ Like</span><span>◌ Comment</span><span>↗ Share</span><span>⌑ Save</span></div>
       </div>
@@ -1009,15 +1009,15 @@ function App() {
 
   const pageDescription = {
     dashboard:
-      "Manage and schedule your social media content",
+      "Plan, publish, and manage every social moment from one workspace",
     posts:
-      "View, search, edit and manage all your posts",
+      "Create, refine, and manage your publishing pipeline",
     calendar:
-      "View your scheduled content by date",
+      "Keep your publishing rhythm clear and on track",
     analytics:
-      "Track your social media scheduling performance",
+      "Understand your content mix and publishing performance",
     settings:
-      "Manage your SocialPilot preferences",
+      "Shape your workspace, preferences, and connected channels",
   };
 
   // =====================================================
@@ -1118,7 +1118,7 @@ function App() {
                 <p>
                   {editingPost
                     ? "Update your scheduled social media post."
-                    : "Create and schedule your next social media post."}
+                    : "Turn a strong idea into a polished, ready-to-publish post."}
                 </p>
               </div>
 
@@ -1129,7 +1129,7 @@ function App() {
 
             <form onSubmit={handleSubmit}>
               <label htmlFor="content">
-                Post Content
+                Post copy
               </label>
 
               <textarea
@@ -1266,7 +1266,7 @@ function App() {
                 <h2>Quick Actions</h2>
 
                 <p>
-                  Manage your social media workflow.
+                  Keep your publishing workflow moving.
                 </p>
               </div>
             </div>
@@ -1290,7 +1290,7 @@ function App() {
                   <strong>Create Post</strong>
 
                   <small>
-                    Write a new social post
+                    Start with a fresh idea
                   </small>
                 </div>
               </button>
@@ -1306,7 +1306,7 @@ function App() {
                   <strong>Refresh Posts</strong>
 
                   <small>
-                    Load latest posts
+                    Sync your latest content
                   </small>
                 </div>
               </button>
@@ -1323,7 +1323,7 @@ function App() {
                   <strong>View Calendar</strong>
 
                   <small>
-                    Check scheduled content
+                    Review your publishing plan
                   </small>
                 </div>
               </button>
@@ -1340,7 +1340,7 @@ function App() {
                   <strong>View Analytics</strong>
 
                   <small>
-                    Check your performance
+                    Understand your content mix
                   </small>
                 </div>
               </button>
@@ -1356,7 +1356,7 @@ function App() {
               <h2>Recent Posts</h2>
 
               <p>
-                Your latest scheduled and published posts.
+                A focused view of your latest content.
               </p>
             </div>
 
@@ -1976,7 +1976,7 @@ function App() {
             <h2>Settings</h2>
 
             <p>
-              Manage your SocialPilot account and preferences.
+              Manage your profile, workspace preferences, and channels.
             </p>
           </div>
 

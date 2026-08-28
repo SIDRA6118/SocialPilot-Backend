@@ -82,7 +82,7 @@ function Login({
           <span className="auth-kicker">SOCIAL WORK, SIMPLIFIED</span>
           <h1>Turn your ideas into meaningful conversations.</h1>
           <p>
-            Plan, publish, and understand your social presence from one calm,
+            Plan, publish, and understand your social presence from one
             focused workspace.
           </p>
         </div>
@@ -98,7 +98,7 @@ function Login({
           <div className="auth-heading">
             <span className="auth-eyebrow">WELCOME BACK</span>
             <h2>Sign in to your workspace</h2>
-            <p>Enter your details to continue managing your campaigns.</p>
+            <p>Sign in to continue managing your content and campaigns.</p>
           </div>
 
           <form className="auth-form" onSubmit={handleLogin}>
@@ -185,8 +185,8 @@ function Login({
 
           <p className="auth-switch">
             New to SocialPilot?{" "}
-            <button type="button" onClick={onShowRegister}>
-              Create an account
+              <button type="button" onClick={onShowRegister}>
+              Create your workspace
             </button>
           </p>
         </div>
