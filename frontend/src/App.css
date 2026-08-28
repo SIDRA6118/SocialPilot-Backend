@@ -1476,6 +1476,32 @@ body.dark-mode .connect-button {
   color: #a0aabd;
 }
 
+.password-input-wrap {
+  position: relative;
+}
+
+.password-input-wrap input {
+  padding-right: 70px;
+}
+
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  padding: 4px;
+  border: 0;
+  background: transparent;
+  color: #4d6097;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.password-toggle:hover {
+  color: #28365f;
+  text-decoration: underline;
+}
+
 .auth-hint {
   display: block;
   margin-top: 7px;
