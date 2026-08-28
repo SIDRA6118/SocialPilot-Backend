@@ -1,12 +1,24 @@
 import { useState } from "react";
 import axios from "axios";
 
-function Login({ onLogin, onShowRegister }) {
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+
+function Login({
+  onLogin,
+  onShowRegister,
+  savedAccounts = [],
+  onSelectAccount,
+  onRemoveAccount,
+}) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  const selectSavedAccount = (account) => {
+    onSelectAccount(account);
+  };
 
   const handleLogin = async (event) => {
     event.preventDefault();
@@ -15,11 +27,12 @@ function Login({ onLogin, onShowRegister }) {
 
     try {
       const response = await axios.post(
-        "http://127.0.0.1:8000/api/token/",
+        `${API_BASE_URL}/api/token/`,
         {
           username: username,
           password: password,
-        }
+        },
+        { timeout: 10000 }
       );
 
       localStorage.setItem(
@@ -32,13 +45,26 @@ function Login({ onLogin, onShowRegister }) {
         response.data.refresh
       );
 
-      onLogin();
+      onLogin({
+        username,
+        access: response.data.access,
+        refresh: response.data.refresh,
+      });
     } catch (error) {
       console.error(error);
-      setError(
-        error.response?.data?.detail ||
-          "Invalid username or password."
-      );
+
+      if (error.code === "ECONNABORTED" || error.code === "ERR_NETWORK") {
+        setError(
+          "Unable to connect to the server. Start Django on port 8000 and try again."
+        );
+      } else if (error.response?.status === 401) {
+        setError("Invalid username or password.");
+      } else {
+        setError(
+          error.response?.data?.detail ||
+            "Login failed. Please try again."
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -120,6 +146,42 @@ function Login({ onLogin, onShowRegister }) {
               {!loading && <span aria-hidden="true">→</span>}
             </button>
           </form>
+
+          {savedAccounts.length > 0 && (
+            <div className="saved-accounts">
+              <div className="saved-accounts-heading">
+                <span>Saved accounts</span>
+                <small>Switch without retyping your details</small>
+              </div>
+
+              {savedAccounts.map((account) => (
+                <div className="saved-account" key={account.username}>
+                  <button
+                    type="button"
+                    className="saved-account-select"
+                    onClick={() => selectSavedAccount(account)}
+                  >
+                    <span className="saved-account-avatar">
+                      {account.username.charAt(0).toUpperCase()}
+                    </span>
+                    <span>
+                      <strong>{account.username}</strong>
+                      <small>Saved SocialPilot account</small>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="saved-account-remove"
+                    onClick={() => onRemoveAccount(account.username)}
+                    aria-label={`Remove ${account.username} from saved accounts`}
+                    title="Remove saved account"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
 
           <p className="auth-switch">
             New to SocialPilot?{" "}

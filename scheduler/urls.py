@@ -5,6 +5,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     ScheduledPostViewSet,
     SocialAccountViewSet,
+    TeamMemberViewSet,
     RegisterView,
 )
 
@@ -21,6 +22,12 @@ router.register(
     r"social-accounts",
     SocialAccountViewSet,
     basename="social-accounts",
+)
+
+router.register(
+    r"team-members",
+    TeamMemberViewSet,
+    basename="team-members",
 )
 
 

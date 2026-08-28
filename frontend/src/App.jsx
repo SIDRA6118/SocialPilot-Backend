@@ -4,6 +4,8 @@ import Login from "./Login";
 import Register from "./Register";
 
 const API_URL = "http://127.0.0.1:8000/api/posts/";
+const SOCIAL_ACCOUNTS_URL = "http://127.0.0.1:8000/api/social-accounts/";
+const TEAM_URL = "http://127.0.0.1:8000/api/team-members/";
 const REFRESH_URL = "http://127.0.0.1:8000/api/token/refresh/";
 
 const SOCIAL_PLATFORMS = [
@@ -100,6 +102,62 @@ function MessageBox({ message }) {
   return <div className="message">{message}</div>;
 }
 
+function PlatformIcon({ platform, className = "" }) {
+  const normalizedPlatform = platform?.toLowerCase();
+
+  if (normalizedPlatform === "linkedin") {
+    return (
+      <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+        <path fill="currentColor" d="M5.1 7.2A2.1 2.1 0 1 0 5.1 3a2.1 2.1 0 0 0 0 4.2ZM3.3 21h3.6V9H3.3v12ZM9 9v12h3.6v-6.6c0-1.7.3-3.4 2.5-3.4 2.1 0 2.1 2 2.1 3.5V21H21v-7.2c0-3.5-.7-6.2-4.7-6.2-1.9 0-3.2 1-3.7 1.9h-.1V9H9Z" />
+      </svg>
+    );
+  }
+
+  if (normalizedPlatform === "twitter") {
+    return (
+      <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+        <path fill="currentColor" d="M18.9 2H22l-6.8 7.8L23.2 22h-6.3l-5-6.5L6.2 22H3.1l7.3-8.4L2.4 2h6.4l4.5 5.9L18.9 2Zm-1.1 17.8h1.7L7.9 4.1H6.1l11.7 15.7Z" />
+      </svg>
+    );
+  }
+
+  if (normalizedPlatform === "facebook") {
+    return (
+      <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+        <path fill="currentColor" d="M13.7 21v-8h2.7l.4-3.1h-3.1v-2c0-.9.3-1.5 1.6-1.5H17V3.6c-.3 0-1.3-.1-2.4-.1-2.4 0-4.1 1.5-4.1 4.2v2.2H8v3.1h2.5v8h3.2Z" />
+      </svg>
+    );
+  }
+
+  if (normalizedPlatform === "instagram") {
+    return (
+      <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="3" y="3" width="18" height="18" rx="5" fill="none" stroke="currentColor" strokeWidth="2" />
+        <circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" strokeWidth="2" />
+        <circle cx="17.5" cy="6.5" r="1.2" fill="currentColor" />
+      </svg>
+    );
+  }
+
+  if (normalizedPlatform === "youtube") {
+    return (
+      <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+        <path fill="currentColor" d="M21.6 7.2a2.9 2.9 0 0 0-2-2C17.8 4.7 12 4.7 12 4.7s-5.8 0-7.6.5a2.9 2.9 0 0 0-2 2A30.2 30.2 0 0 0 2 12a30.2 30.2 0 0 0 .4 4.8 2.9 2.9 0 0 0 2 2c1.8.5 7.6.5 7.6.5s5.8 0 7.6-.5a2.9 2.9 0 0 0 2-2A30.2 30.2 0 0 0 22 12a30.2 30.2 0 0 0-.4-4.8ZM10 15.5v-7l6 3.5-6 3.5Z" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="currentColor" d="M12 2.5c-5.2 0-8.4 3.7-8.4 7.7 0 3.1 1.8 5.8 4.5 6.8-.1-.6-.2-1.5 0-2.2l1-4.1s-.3-.7-.3-1.7c0-1.6.9-2.8 2.1-2.8 1 0 1.5.8 1.5 1.7 0 1-.6 2.4-.9 3.7-.3 1.1.5 2 1.6 2 1.9 0 3.3-2 3.3-4.9 0-2.6-1.9-4.4-4.6-4.4-3.1 0-5 2.3-5 4.7 0 .9.3 1.9.8 2.4.1.1.1.2.1.4l-.3 1.2c-.1.4-.4.5-.8.3-1.5-.7-2.4-2.8-2.4-4.5 0-3.7 2.7-7.1 7.8-7.1 4.1 0 7.2 2.9 7.2 6.7 0 4-2.5 7.2-6 7.2-1.2 0-2.4-.6-2.8-1.3l-.7 2.7c-.3 1-.9 2.2-1.3 2.9 1 .3 2 .5 3.1.5 5.2 0 9.4-4.2 9.4-9.4S17.2 2.5 12 2.5Z" />
+    </svg>
+  );
+}
+
+function PageRenderer({ renderPage }) {
+  return renderPage();
+}
+
 function App() {
   // =====================================================
   // AUTHENTICATION
@@ -111,8 +169,86 @@ function App() {
 
   const [authScreen, setAuthScreen] = useState("login");
 
-  const handleLogin = () => {
+  const [savedAccounts, setSavedAccounts] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("socialpilot_accounts") || "[]");
+    } catch {
+      return [];
+    }
+  });
+
+  const [profile, setProfile] = useState(() => ({
+    username: localStorage.getItem("username") || "Social Admin",
+    email: localStorage.getItem("email") || "",
+  }));
+
+  const [profileDraft, setProfileDraft] = useState(profile);
+  const [editingProfile, setEditingProfile] = useState(false);
+
+  const handleLogin = (account) => {
+    localStorage.setItem("username", account.username);
+    setProfile((previousProfile) => ({
+      ...previousProfile,
+      username: account.username,
+    }));
+
+    setSavedAccounts((previousAccounts) => {
+      const nextAccounts = [
+        account,
+        ...previousAccounts.filter(
+          (savedAccount) => savedAccount.username !== account.username
+        ),
+      ];
+      localStorage.setItem("socialpilot_accounts", JSON.stringify(nextAccounts));
+      return nextAccounts;
+    });
     setIsAuthenticated(true);
+  };
+
+  const handleSelectAccount = (account) => {
+    localStorage.setItem("access_token", account.access);
+    localStorage.setItem("refresh_token", account.refresh);
+    handleLogin(account);
+  };
+
+  const handleSwitchAccount = () => {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+    setPosts([]);
+    setEditingPost(null);
+    setAuthScreen("login");
+    setIsAuthenticated(false);
+  };
+
+  const handleRemoveAccount = (username) => {
+    setSavedAccounts((previousAccounts) => {
+      const nextAccounts = previousAccounts.filter(
+        (account) => account.username !== username
+      );
+      localStorage.setItem("socialpilot_accounts", JSON.stringify(nextAccounts));
+      return nextAccounts;
+    });
+  };
+
+  const startProfileEdit = () => {
+    setProfileDraft(profile);
+    setEditingProfile(true);
+  };
+
+  const saveProfile = (event) => {
+    event.preventDefault();
+
+    const nextProfile = {
+      username: profileDraft.username.trim() || "Social Admin",
+      email: profileDraft.email.trim(),
+    };
+
+    localStorage.setItem("username", nextProfile.username);
+    localStorage.setItem("email", nextProfile.email);
+    setProfile(nextProfile);
+    setProfileDraft(nextProfile);
+    setEditingProfile(false);
+    setMessage("Profile details saved successfully.");
   };
 
   // =====================================================
@@ -120,6 +256,8 @@ function App() {
   // =====================================================
 
   const [posts, setPosts] = useState([]);
+  const [socialAccounts, setSocialAccounts] = useState([]);
+  const [teamMembers, setTeamMembers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [activePage, setActivePage] = useState("dashboard");
@@ -141,20 +279,15 @@ function App() {
       "false"
   );
 
-  const [connectedPlatforms, setConnectedPlatforms] = useState(() => {
-    try {
-      return JSON.parse(
-        localStorage.getItem("socialpilot_connected_platforms") || "{}"
-      );
-    } catch {
-      return {};
-    }
-  });
-
   const [form, setForm] = useState({
     content: "",
     platform: "LinkedIn",
+    content_type: "text",
+    media_url: "",
     scheduled_time: "",
+    status: "scheduled",
+    is_recurring: false,
+    recurrence: "weekly",
   });
 
   // =====================================================
@@ -219,7 +352,23 @@ function App() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setIsAuthenticated, setLoading, setMessage, setPosts]);
+
+  const fetchModuleData = useCallback(async () => {
+    if (!localStorage.getItem("access_token")) return;
+    try {
+      const [accountsResponse, teamResponse] = await Promise.all([
+        requestWithAuth(SOCIAL_ACCOUNTS_URL),
+        requestWithAuth(TEAM_URL),
+      ]);
+      const accounts = await accountsResponse.json();
+      const team = await teamResponse.json();
+      setSocialAccounts(Array.isArray(accounts) ? accounts : accounts.results || []);
+      setTeamMembers(Array.isArray(team) ? team : team.results || []);
+    } catch (error) {
+      console.error("Module data error:", error);
+    }
+  }, [setSocialAccounts, setTeamMembers]);
 
   // =====================================================
   // INITIAL LOAD
@@ -232,10 +381,11 @@ function App() {
 
     const fetchTimer = window.setTimeout(() => {
       fetchPosts();
+      fetchModuleData();
     }, 0);
 
     return () => window.clearTimeout(fetchTimer);
-  }, [isAuthenticated, fetchPosts]);
+  }, [isAuthenticated, fetchPosts, fetchModuleData]);
 
   // =====================================================
   // THEME
@@ -271,7 +421,12 @@ function App() {
     setForm({
       content: "",
       platform: "LinkedIn",
+      content_type: "text",
+      media_url: "",
       scheduled_time: "",
+      status: "scheduled",
+      is_recurring: false,
+      recurrence: "weekly",
     });
 
     setEditingPost(null);
@@ -312,9 +467,14 @@ function App() {
       const postData = {
         content: form.content.trim(),
         platform: form.platform,
+        content_type: form.content_type,
+        media_url: form.media_url.trim(),
         scheduled_time: new Date(
           form.scheduled_time
         ).toISOString(),
+        status: form.status,
+        is_recurring: form.is_recurring,
+        recurrence: form.is_recurring ? form.recurrence : "",
       };
 
       let response;
@@ -429,7 +589,12 @@ function App() {
     setForm({
       content: post.content || "",
       platform: post.platform || "LinkedIn",
+      content_type: post.content_type || "text",
+      media_url: post.media_url || "",
       scheduled_time: formattedDate,
+      status: post.status || "scheduled",
+      is_recurring: post.is_recurring || false,
+      recurrence: post.recurrence || "weekly",
     });
 
     setActivePage("dashboard");
@@ -699,27 +864,66 @@ function App() {
   };
 
   const togglePlatformConnection = (platform) => {
-    setConnectedPlatforms((previousPlatforms) => {
-      const nextPlatforms = { ...previousPlatforms };
+    const account = socialAccounts.find((item) => item.platform === platform.name.toLowerCase());
+    if (account) {
+      requestWithAuth(`${SOCIAL_ACCOUNTS_URL}${account.id}/`, { method: "DELETE" })
+        .then(() => {
+          setSocialAccounts((items) => items.filter((item) => item.id !== account.id));
+          setMessage(`${platform.name} disconnected.`);
+        })
+        .catch(() => setMessage("Unable to disconnect this account."));
+      return;
+    }
 
-      if (nextPlatforms[platform.name]) {
-        delete nextPlatforms[platform.name];
-        setMessage(`${platform.name} disconnected.`);
-      } else {
-        nextPlatforms[platform.name] = {
-          accountName: `${platform.name} account`,
-          connectedAt: new Date().toISOString(),
-        };
-        setMessage(`${platform.name} connected successfully.`);
-      }
+    const accountName = window.prompt(`Name for your ${platform.name} profile:`, `${platform.name} account`);
+    const accessToken = window.prompt("Provider access token (stored securely by the backend):");
+    if (!accountName || !accessToken) return;
+    requestWithAuth(SOCIAL_ACCOUNTS_URL, {
+      method: "POST",
+      body: JSON.stringify({
+        platform: platform.name.toLowerCase(),
+        account_name: accountName,
+        access_token: accessToken,
+      }),
+    }).then(async (response) => {
+      if (!response.ok) throw new Error("Account connection failed");
+      const created = await response.json();
+      setSocialAccounts((items) => [...items, created]);
+      setMessage(`${platform.name} connected successfully.`);
+    }).catch(() => setMessage("Unable to connect this account."));
+  };
 
-      localStorage.setItem(
-        "socialpilot_connected_platforms",
-        JSON.stringify(nextPlatforms)
-      );
+  const inviteTeamMember = async () => {
+    const invitedEmail = window.prompt("Team member email address:");
+    if (!invitedEmail) return;
+    const role = window.prompt("Role: creator, marketing, business, or administrator", "creator");
+    if (!role || !["creator", "marketing", "business", "administrator"].includes(role)) {
+      setMessage("Please choose a valid team role.");
+      return;
+    }
+    try {
+      const response = await requestWithAuth(TEAM_URL, {
+        method: "POST",
+        body: JSON.stringify({ invited_email: invitedEmail, role }),
+      });
+      if (!response.ok) throw new Error("Invitation failed");
+      const createdMember = await response.json();
+      setTeamMembers((members) => [...members, createdMember]);
+      setMessage(`Invitation sent to ${invitedEmail}.`);
+    } catch {
+      setMessage("Unable to invite this team member.");
+    }
+  };
 
-      return nextPlatforms;
-    });
+  const removeTeamMember = async (memberId) => {
+    try {
+      const response = await requestWithAuth(`${TEAM_URL}${memberId}/`, { method: "DELETE" });
+      if (!response.ok) throw new Error("Removal failed");
+      setTeamMembers((members) => members.filter((member) => member.id !== memberId));
+      setMessage("Team member removed.");
+    } catch {
+      setMessage("Unable to remove this team member.");
+    }
   };
 
   // =====================================================
@@ -751,25 +955,6 @@ function App() {
   // PLATFORM ICON
   // =====================================================
 
-  const getPlatformIcon = (platform) => {
-    switch (platform?.toLowerCase()) {
-      case "linkedin":
-        return "in";
-
-      case "twitter":
-        return "𝕏";
-
-      case "instagram":
-        return "◎";
-
-      case "facebook":
-        return "f";
-
-      default:
-        return "📱";
-    }
-  };
-
   // =====================================================
   // POST ITEM
   // =====================================================
@@ -778,7 +963,7 @@ function App() {
     return (
       <div className="post-item">
         <div className="platform-icon">
-          {getPlatformIcon(post.platform)}
+          <PlatformIcon platform={post.platform} />
         </div>
 
         <div className="post-content">
@@ -911,6 +1096,24 @@ function App() {
 
               <div className="form-row">
                 <div className="form-group">
+                  <label htmlFor="content_type">Content type</label>
+                  <select id="content_type" name="content_type" value={form.content_type} onChange={handleChange}>
+                    <option value="text">Text post</option>
+                    <option value="image">Image</option>
+                    <option value="video">Video</option>
+                    <option value="carousel">Carousel</option>
+                    <option value="story">Story</option>
+                    <option value="reel">Reel</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label htmlFor="media_url">Media URL</label>
+                  <input id="media_url" name="media_url" type="url" value={form.media_url} onChange={handleChange} placeholder="https://..." />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
                   <label htmlFor="platform">
                     Platform
                   </label>
@@ -960,7 +1163,26 @@ function App() {
                     onChange={handleChange}
                   />
                 </div>
+                <div className="form-group">
+                  <label htmlFor="status">Workflow state</label>
+                  <select id="status" name="status" value={form.status} onChange={handleChange}>
+                    <option value="scheduled">Scheduled</option>
+                    <option value="draft">Draft</option>
+                  </select>
+                </div>
               </div>
+
+              <label className="check-row">
+                <input type="checkbox" name="is_recurring" checked={form.is_recurring} onChange={(event) => setForm((current) => ({ ...current, is_recurring: event.target.checked }))} />
+                Repeat this post
+              </label>
+              {form.is_recurring && (
+                <select name="recurrence" value={form.recurrence} onChange={handleChange}>
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                </select>
+              )}
 
               <button
                 type="submit"
@@ -1664,9 +1886,7 @@ function App() {
                 key={platform}
               >
                 <div className="platform-icon">
-                  {getPlatformIcon(
-                    platform
-                  )}
+                  <PlatformIcon platform={platform} />
                 </div>
 
                 <div className="post-content">
@@ -1699,14 +1919,6 @@ function App() {
   // =====================================================
 
   const SettingsPage = () => {
-    const username =
-      localStorage.getItem("username") ||
-      "Social Admin";
-
-    const email =
-      localStorage.getItem("email") ||
-      "Admin Account";
-
     const savePreferences = () => {
       localStorage.setItem(
         "socialpilot_notifications",
@@ -1734,51 +1946,101 @@ function App() {
           </span>
         </div>
 
-        <div
-          style={{
-            padding: "18px",
-            border:
-              "1px solid #e7ebf1",
-            borderRadius: "12px",
-            marginBottom: "20px",
-          }}
-        >
-          <h3
-            style={{
-              marginBottom: "15px",
-            }}
-          >
-            Profile
-          </h3>
-
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "15px",
-            }}
-          >
-            <div className="avatar">
-              SK
-            </div>
-
+        <section className="profile-section">
+          <div className="settings-section-heading">
             <div>
-              <strong>
-                {username}
-              </strong>
-
-              <small
-                style={{
-                  display: "block",
-                  color: "#64748b",
-                  marginTop: "4px",
-                }}
-              >
-                {email}
-              </small>
+              <span className="settings-eyebrow">ACCOUNT</span>
+              <h3>Profile information</h3>
+              <p>Keep your workspace identity up to date.</p>
             </div>
+            {!editingProfile && (
+              <button type="button" className="settings-edit-button" onClick={startProfileEdit}>
+                Edit profile
+              </button>
+            )}
           </div>
-        </div>
+
+          {editingProfile ? (
+            <form className="profile-form" onSubmit={saveProfile}>
+              <div className="profile-form-row">
+                <div className="form-group">
+                  <label htmlFor="profile-username">Display name</label>
+                  <input
+                    id="profile-username"
+                    value={profileDraft.username}
+                    onChange={(event) => setProfileDraft({ ...profileDraft, username: event.target.value })}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="profile-email">Email address</label>
+                  <input
+                    id="profile-email"
+                    type="email"
+                    value={profileDraft.email}
+                    onChange={(event) => setProfileDraft({ ...profileDraft, email: event.target.value })}
+                    placeholder="you@company.com"
+                  />
+                </div>
+              </div>
+              <div className="profile-actions">
+                <button type="submit" className="schedule-btn">Save profile</button>
+                <button type="button" className="refresh-btn" onClick={() => setEditingProfile(false)}>Cancel</button>
+              </div>
+            </form>
+          ) : (
+            <div className="profile-summary">
+              <div className="profile-summary-avatar">
+                {profile.username.slice(0, 2).toUpperCase()}
+              </div>
+              <div>
+                <strong>{profile.username}</strong>
+                <span>{profile.email || "Add an email address"}</span>
+              </div>
+              <span className="profile-badge">Workspace owner</span>
+            </div>
+          )}
+        </section>
+
+        <section className="saved-signins-section">
+          <div className="settings-section-heading">
+            <div>
+              <span className="settings-eyebrow">QUICK ACCESS</span>
+              <h3>Saved sign-ins</h3>
+              <p>Switch between trusted SocialPilot accounts on this device.</p>
+            </div>
+            <span className="saved-signins-count">{savedAccounts.length}</span>
+          </div>
+
+          {savedAccounts.length === 0 ? (
+            <p className="saved-signins-empty">No saved accounts on this device.</p>
+          ) : (
+            <div className="saved-signins-list">
+              {savedAccounts.map((account) => (
+                <div className="saved-signin-row" key={account.username}>
+                  <div className="saved-account-avatar">
+                    {account.username.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="saved-signin-details">
+                    <strong>{account.username}</strong>
+                    <span>Saved sign-in token</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="saved-account-remove"
+                    onClick={() => handleRemoveAccount(account.username)}
+                    title={`Remove ${account.username}`}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <small className="security-note">
+            Passwords are never saved. Remove an account here to clear its saved sign-in from this browser.
+          </small>
+        </section>
 
         <div
           style={{
@@ -1852,13 +2114,13 @@ function App() {
               <p>Connect the channels you use to publish and monitor content.</p>
             </div>
             <span className="integration-count">
-              {Object.keys(connectedPlatforms).length}/{SOCIAL_PLATFORMS.length} connected
+              {socialAccounts.length}/{SOCIAL_PLATFORMS.length} connected
             </span>
           </div>
 
           <div className="integration-grid">
             {SOCIAL_PLATFORMS.map((platform) => {
-              const account = connectedPlatforms[platform.name];
+              const account = socialAccounts.find((item) => item.platform === platform.name.toLowerCase());
 
               return (
                 <div className={`integration-card ${account ? "is-connected" : ""}`} key={platform.name}>
@@ -1867,7 +2129,7 @@ function App() {
                       className="integration-icon"
                       style={{ backgroundColor: platform.color }}
                     >
-                      {platform.icon}
+                      <PlatformIcon platform={platform.name} />
                     </span>
                     <span className={`connection-status ${account ? "connected" : "available"}`}>
                       <span className="status-dot"></span>
@@ -1876,7 +2138,7 @@ function App() {
                   </div>
 
                   <strong>{platform.name}</strong>
-                  <p>{account ? account.accountName : platform.description}</p>
+                  <p>{account ? account.account_name : platform.description}</p>
 
                   <button
                     type="button"
@@ -1892,6 +2154,32 @@ function App() {
           <small className="integration-note">
             Connections are saved for this browser. Provider OAuth credentials can be enabled from the backend when available.
           </small>
+        </div>
+
+        <div className="team-section">
+          <div className="integration-heading">
+            <div>
+              <h3>Team management</h3>
+              <p>Invite collaborators and assign workspace roles.</p>
+            </div>
+            <button type="button" className="connect-button" onClick={inviteTeamMember}>Invite member</button>
+          </div>
+          {teamMembers.length === 0 ? (
+            <p className="saved-signins-empty">No collaborators yet. You are the workspace owner.</p>
+          ) : (
+            <div className="saved-signins-list">
+              {teamMembers.map((member) => (
+                <div className="saved-signin-row" key={member.id}>
+                  <div className="saved-account-avatar">{(member.username || member.invited_email).charAt(0).toUpperCase()}</div>
+                  <div className="saved-signin-details">
+                    <strong>{member.username || member.invited_email}</strong>
+                    <span>{member.role} · {member.status}</span>
+                  </div>
+                  <button type="button" className="saved-account-remove" onClick={() => removeTeamMember(member.id)}>Remove</button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <button
@@ -1914,6 +2202,18 @@ function App() {
         >
           🚪 Logout
         </button>
+
+        <button
+          type="button"
+          className="refresh-btn"
+          style={{
+            width: "100%",
+            marginTop: "10px",
+          }}
+          onClick={handleSwitchAccount}
+        >
+          ⇄ Switch account
+        </button>
       </section>
     );
   };
@@ -1925,20 +2225,20 @@ function App() {
   const renderPage = () => {
     switch (activePage) {
       case "posts":
-        return <PostsPage />;
+        return <PageRenderer renderPage={PostsPage} />;
 
       case "calendar":
-        return <CalendarPage />;
+        return <PageRenderer renderPage={CalendarPage} />;
 
       case "analytics":
-        return <AnalyticsPage />;
+        return <PageRenderer renderPage={AnalyticsPage} />;
 
       case "settings":
-        return <SettingsPage />;
+        return <PageRenderer renderPage={SettingsPage} />;
 
       case "dashboard":
       default:
-        return <DashboardPage />;
+        return <PageRenderer renderPage={DashboardPage} />;
     }
   };
 
@@ -1960,6 +2260,9 @@ function App() {
       <Login
         onLogin={handleLogin}
         onShowRegister={() => setAuthScreen("register")}
+        savedAccounts={savedAccounts}
+        onSelectAccount={handleSelectAccount}
+        onRemoveAccount={handleRemoveAccount}
       />
     );
   }
@@ -2076,15 +2379,20 @@ function App() {
             </div>
 
             <div>
-              <strong>
-                Social Admin
-              </strong>
-
+              <strong>{profile.username}</strong>
               <small>
                 Admin
               </small>
             </div>
           </div>
+
+          <button
+            type="button"
+            className="sidebar-switch"
+            onClick={handleSwitchAccount}
+          >
+            ⇄ Switch account
+          </button>
         </div>
       </aside>
 
