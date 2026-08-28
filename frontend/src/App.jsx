@@ -1,8 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import "./App.css";
+import Login from "./Login";
+import Register from "./Register";
 
 const API_URL = "http://127.0.0.1:8000/api/posts/";
 const REFRESH_URL = "http://127.0.0.1:8000/api/token/refresh/";
+
+const SOCIAL_PLATFORMS = [
+  { name: "LinkedIn", icon: "in", color: "#0a66c2", description: "Professional updates and company pages" },
+  { name: "Twitter", icon: "𝕏", color: "#111827", description: "Short-form posts and real-time conversations" },
+  { name: "Facebook", icon: "f", color: "#1877f2", description: "Pages, communities, and audience updates" },
+  { name: "Instagram", icon: "◎", color: "#d62976", description: "Visual stories, posts, and brand moments" },
+  { name: "YouTube", icon: "▶", color: "#ff0000", description: "Video publishing and channel management" },
+  { name: "Pinterest", icon: "P", color: "#bd081c", description: "Pins, boards, and visual discovery" },
+];
 
 const getHeaders = () => {
   const accessToken = localStorage.getItem("access_token");
@@ -42,6 +53,7 @@ const refreshAccessToken = async () => {
     const data = await response.json();
 
     if (!data.access) {
+      localStorage.removeItem("access_token");
       return false;
     }
 
@@ -63,17 +75,18 @@ const requestWithAuth = async (url, options = {}) => {
     },
   });
 
-  if (
-    response.status === 401 &&
-    (await refreshAccessToken())
-  ) {
-    response = await fetch(url, {
-      ...options,
-      headers: {
-        ...getHeaders(),
-        ...(options.headers || {}),
-      },
-    });
+  if (response.status === 401) {
+    const refreshed = await refreshAccessToken();
+
+    if (refreshed) {
+      response = await fetch(url, {
+        ...options,
+        headers: {
+          ...getHeaders(),
+          ...(options.headers || {}),
+        },
+      });
+    }
   }
 
   return response;
@@ -89,23 +102,30 @@ function MessageBox({ message }) {
 
 function App() {
   // =====================================================
+  // AUTHENTICATION
+  // =====================================================
+
+  const [isAuthenticated, setIsAuthenticated] = useState(
+    !!localStorage.getItem("access_token")
+  );
+
+  const [authScreen, setAuthScreen] = useState("login");
+
+  const handleLogin = () => {
+    setIsAuthenticated(true);
+  };
+
+  // =====================================================
   // STATE
   // =====================================================
 
   const [posts, setPosts] = useState([]);
-
   const [loading, setLoading] = useState(false);
-
   const [message, setMessage] = useState("");
-
   const [activePage, setActivePage] = useState("dashboard");
-
   const [editingPost, setEditingPost] = useState(null);
-
   const [searchTerm, setSearchTerm] = useState("");
-
   const [platformFilter, setPlatformFilter] = useState("All");
-
   const [statusFilter, setStatusFilter] = useState("All");
 
   const [currentDate, setCurrentDate] = useState(
@@ -121,6 +141,16 @@ function App() {
       "false"
   );
 
+  const [connectedPlatforms, setConnectedPlatforms] = useState(() => {
+    try {
+      return JSON.parse(
+        localStorage.getItem("socialpilot_connected_platforms") || "{}"
+      );
+    } catch {
+      return {};
+    }
+  });
+
   const [form, setForm] = useState({
     content: "",
     platform: "LinkedIn",
@@ -132,6 +162,10 @@ function App() {
   // =====================================================
 
   const fetchPosts = useCallback(async () => {
+    if (!localStorage.getItem("access_token")) {
+      return;
+    }
+
     try {
       setLoading(true);
       setMessage("");
@@ -152,8 +186,12 @@ function App() {
 
       if (!response.ok) {
         if (response.status === 401) {
+          localStorage.removeItem("access_token");
+          localStorage.removeItem("refresh_token");
+          setIsAuthenticated(false);
+
           throw new Error(
-            "Unauthorized. Please login again."
+            "Session expired. Please login again."
           );
         }
 
@@ -188,12 +226,16 @@ function App() {
   // =====================================================
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      return undefined;
+    }
+
     const fetchTimer = window.setTimeout(() => {
       fetchPosts();
     }, 0);
 
     return () => window.clearTimeout(fetchTimer);
-  }, [fetchPosts]);
+  }, [isAuthenticated, fetchPosts]);
 
   // =====================================================
   // THEME
@@ -260,6 +302,7 @@ function App() {
       setMessage(
         "Please login before managing posts."
       );
+      setIsAuthenticated(false);
       return;
     }
 
@@ -303,8 +346,12 @@ function App() {
 
       if (!response.ok) {
         if (response.status === 401) {
+          localStorage.removeItem("access_token");
+          localStorage.removeItem("refresh_token");
+          setIsAuthenticated(false);
+
           throw new Error(
-            "401 Unauthorized: Please login again."
+            "Session expired. Please login again."
           );
         }
 
@@ -323,15 +370,11 @@ function App() {
         );
       }
 
-      if (editingPost) {
-        setMessage(
-          "Post updated successfully! ✨"
-        );
-      } else {
-        setMessage(
-          "Post scheduled successfully! 🎉"
-        );
-      }
+      setMessage(
+        editingPost
+          ? "Post updated successfully! ✨"
+          : "Post scheduled successfully! 🎉"
+      );
 
       resetForm();
 
@@ -431,8 +474,12 @@ function App() {
         }
 
         if (response.status === 401) {
+          localStorage.removeItem("access_token");
+          localStorage.removeItem("refresh_token");
+          setIsAuthenticated(false);
+
           throw new Error(
-            "Unauthorized. Please login again."
+            "Session expired. Please login again."
           );
         }
 
@@ -476,9 +523,11 @@ function App() {
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
 
-    setMessage("Logged out successfully.");
-
-    window.location.reload();
+    setPosts([]);
+    setEditingPost(null);
+    setActivePage("dashboard");
+    setMessage("");
+    setIsAuthenticated(false);
   };
 
   // =====================================================
@@ -515,6 +564,8 @@ function App() {
       Twitter: 0,
       Facebook: 0,
       Instagram: 0,
+      YouTube: 0,
+      Pinterest: 0,
     };
 
     posts.forEach((post) => {
@@ -566,12 +617,11 @@ function App() {
   ]);
 
   // =====================================================
-  // CALENDAR HELPERS
+  // CALENDAR
   // =====================================================
 
   const calendarData = useMemo(() => {
     const year = currentDate.getFullYear();
-
     const month = currentDate.getMonth();
 
     const firstDay = new Date(
@@ -605,7 +655,6 @@ function App() {
     }
 
     const year = currentDate.getFullYear();
-
     const month = currentDate.getMonth();
 
     return posts.filter((post) => {
@@ -649,8 +698,32 @@ function App() {
     setCurrentDate(new Date());
   };
 
+  const togglePlatformConnection = (platform) => {
+    setConnectedPlatforms((previousPlatforms) => {
+      const nextPlatforms = { ...previousPlatforms };
+
+      if (nextPlatforms[platform.name]) {
+        delete nextPlatforms[platform.name];
+        setMessage(`${platform.name} disconnected.`);
+      } else {
+        nextPlatforms[platform.name] = {
+          accountName: `${platform.name} account`,
+          connectedAt: new Date().toISOString(),
+        };
+        setMessage(`${platform.name} connected successfully.`);
+      }
+
+      localStorage.setItem(
+        "socialpilot_connected_platforms",
+        JSON.stringify(nextPlatforms)
+      );
+
+      return nextPlatforms;
+    });
+  };
+
   // =====================================================
-  // PAGE HEADER
+  // PAGE TITLES
   // =====================================================
 
   const pageTitle = {
@@ -759,14 +832,12 @@ function App() {
   };
 
   // =====================================================
-  // DASHBOARD PAGE
+  // DASHBOARD
   // =====================================================
 
   const DashboardPage = () => {
     return (
       <>
-        {/* STATISTICS */}
-
         <section className="stats">
           <div className="stat-card">
             <div className="stat-icon blue">
@@ -802,11 +873,7 @@ function App() {
           </div>
         </section>
 
-        {/* DASHBOARD GRID */}
-
         <section className="dashboard-grid">
-          {/* CREATE POST */}
-
           <div className="card create-card">
             <div className="card-header">
               <div>
@@ -869,6 +936,14 @@ function App() {
                     <option value="Instagram">
                       Instagram
                     </option>
+
+                    <option value="YouTube">
+                      YouTube
+                    </option>
+
+                    <option value="Pinterest">
+                      Pinterest
+                    </option>
                   </select>
                 </div>
 
@@ -915,8 +990,6 @@ function App() {
             </form>
           </div>
 
-          {/* QUICK ACTIONS */}
-
           <div className="card quick-card">
             <div className="card-header">
               <div>
@@ -934,9 +1007,11 @@ function App() {
                 onClick={() => {
                   resetForm();
 
-                  document
-                    .querySelector("textarea")
-                    ?.focus();
+                  setTimeout(() => {
+                    document
+                      .querySelector("textarea")
+                      ?.focus();
+                  }, 0);
                 }}
               >
                 <span>➕</span>
@@ -1002,8 +1077,6 @@ function App() {
             </div>
           </div>
         </section>
-
-        {/* RECENT POSTS */}
 
         <section className="card posts-card">
           <div className="card-header posts-header">
@@ -1104,8 +1177,6 @@ function App() {
           </span>
         </div>
 
-        {/* FILTERS */}
-
         <div
           className="form-row"
           style={{
@@ -1141,6 +1212,8 @@ function App() {
               <option value="Instagram">
                 Instagram
               </option>
+              <option value="YouTube">YouTube</option>
+              <option value="Pinterest">Pinterest</option>
             </select>
           </div>
         </div>
@@ -1169,8 +1242,6 @@ function App() {
             <option value="failed">Failed</option>
           </select>
         </div>
-
-        {/* POSTS */}
 
         {filteredPosts.length === 0 ? (
           <div className="empty-state">
@@ -1208,8 +1279,7 @@ function App() {
         month: "long",
       });
 
-    const year =
-      currentDate.getFullYear();
+    const year = currentDate.getFullYear();
 
     return (
       <section className="card posts-card">
@@ -1261,8 +1331,6 @@ function App() {
             Next →
           </button>
         </div>
-
-        {/* CALENDAR */}
 
         <div
           style={{
@@ -1430,8 +1498,6 @@ function App() {
           </div>
         </section>
 
-        {/* PLATFORM ANALYTICS */}
-
         <section className="dashboard-grid">
           <div className="card posts-card">
             <div className="card-header">
@@ -1519,8 +1585,6 @@ function App() {
             })}
           </div>
 
-          {/* STATUS */}
-
           <div className="card posts-card">
             <div className="card-header">
               <div>
@@ -1579,8 +1643,6 @@ function App() {
             </div>
           </div>
         </section>
-
-        {/* PLATFORM TABLE */}
 
         <section className="card posts-card">
           <div className="card-header">
@@ -1672,8 +1734,6 @@ function App() {
           </span>
         </div>
 
-        {/* PROFILE */}
-
         <div
           style={{
             padding: "18px",
@@ -1719,8 +1779,6 @@ function App() {
             </div>
           </div>
         </div>
-
-        {/* PREFERENCES */}
 
         <div
           style={{
@@ -1787,6 +1845,55 @@ function App() {
           </label>
         </div>
 
+        <div className="integration-section">
+          <div className="integration-heading">
+            <div>
+              <h3>Social accounts</h3>
+              <p>Connect the channels you use to publish and monitor content.</p>
+            </div>
+            <span className="integration-count">
+              {Object.keys(connectedPlatforms).length}/{SOCIAL_PLATFORMS.length} connected
+            </span>
+          </div>
+
+          <div className="integration-grid">
+            {SOCIAL_PLATFORMS.map((platform) => {
+              const account = connectedPlatforms[platform.name];
+
+              return (
+                <div className={`integration-card ${account ? "is-connected" : ""}`} key={platform.name}>
+                  <div className="integration-card-top">
+                    <span
+                      className="integration-icon"
+                      style={{ backgroundColor: platform.color }}
+                    >
+                      {platform.icon}
+                    </span>
+                    <span className={`connection-status ${account ? "connected" : "available"}`}>
+                      <span className="status-dot"></span>
+                      {account ? "Connected" : "Available"}
+                    </span>
+                  </div>
+
+                  <strong>{platform.name}</strong>
+                  <p>{account ? account.accountName : platform.description}</p>
+
+                  <button
+                    type="button"
+                    className={account ? "disconnect-button" : "connect-button"}
+                    onClick={() => togglePlatformConnection(platform)}
+                  >
+                    {account ? "Disconnect" : "Connect account"}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          <small className="integration-note">
+            Connections are saved for this browser. Provider OAuth credentials can be enabled from the backend when available.
+          </small>
+        </div>
+
         <button
           type="button"
           className="schedule-btn"
@@ -1812,7 +1919,7 @@ function App() {
   };
 
   // =====================================================
-  // MAIN PAGE CONTENT
+  // PAGE ROUTING
   // =====================================================
 
   const renderPage = () => {
@@ -1836,14 +1943,34 @@ function App() {
   };
 
   // =====================================================
-  // UI
+  // SHOW LOGIN IF NOT AUTHENTICATED
+  // =====================================================
+
+  if (!isAuthenticated) {
+    if (authScreen === "register") {
+      return (
+        <Register
+          onRegister={() => setAuthScreen("login")}
+          onBackToLogin={() => setAuthScreen("login")}
+        />
+      );
+    }
+
+    return (
+      <Login
+        onLogin={handleLogin}
+        onShowRegister={() => setAuthScreen("register")}
+      />
+    );
+  }
+
+  // =====================================================
+  // MAIN UI
   // =====================================================
 
   return (
     <div className="app">
-      {/* =================================================
-          SIDEBAR
-      ================================================= */}
+      {/* SIDEBAR */}
 
       <aside className="sidebar">
         <div className="logo">
@@ -1961,13 +2088,9 @@ function App() {
         </div>
       </aside>
 
-      {/* =================================================
-          MAIN
-      ================================================= */}
+      {/* MAIN */}
 
       <main className="main">
-        {/* HEADER */}
-
         <header className="topbar">
           <div>
             <h1>
@@ -1988,15 +2111,9 @@ function App() {
           </button>
         </header>
 
-        {/* MESSAGE */}
-
         <MessageBox message={message} />
 
-        {/* PAGE */}
-
         {renderPage()}
-
-        {/* FOOTER */}
 
         <footer>
           <p>

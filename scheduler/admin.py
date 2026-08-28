@@ -1,6 +1,5 @@
 from django.contrib import admin
-from django.contrib import admin
-from .models import ScheduledPost
+from .models import ScheduledPost, SocialAccount
 
 admin.site.register(ScheduledPost)
-# Register your models here.
+admin.site.register(SocialAccount)

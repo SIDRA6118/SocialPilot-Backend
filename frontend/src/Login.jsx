@@ -1,14 +1,16 @@
 import { useState } from "react";
 import axios from "axios";
 
-function Login({ onLogin }) {
+function Login({ onLogin, onShowRegister }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleLogin = async (event) => {
     event.preventDefault();
     setError("");
+    setLoading(true);
 
     try {
       const response = await axios.post(
@@ -32,60 +34,90 @@ function Login({ onLogin }) {
       onLogin();
     } catch (error) {
       console.error(error);
-      setError("Invalid username or password.");
+      setError(
+        error.response?.data?.detail ||
+          "Invalid username or password."
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="app">
-      <div className="card login-card">
-        <h1 className="logo">SocialPilot</h1>
+    <main className="auth-shell">
+      <section className="auth-visual">
+        <div className="auth-brand">
+          <span className="auth-brand-mark">S</span>
+          <span>SocialPilot</span>
+        </div>
 
-        <p className="subtitle">
-          Login to your account
-        </p>
+        <div className="auth-visual-copy">
+          <span className="auth-kicker">SOCIAL WORK, SIMPLIFIED</span>
+          <h1>Turn your ideas into meaningful conversations.</h1>
+          <p>
+            Plan, publish, and understand your social presence from one calm,
+            focused workspace.
+          </p>
+        </div>
 
-        <form onSubmit={handleLogin}>
-          <div className="form-group">
-            <label>Username</label>
+        <div className="auth-visual-footer">
+          <span className="auth-dot"></span>
+          <span>Everything your team needs to stay consistent.</span>
+        </div>
+      </section>
 
-            <input
-              type="text"
-              value={username}
-              onChange={(e) =>
-                setUsername(e.target.value)
-              }
-              placeholder="Enter username"
-              required
-            />
+      <section className="auth-panel">
+        <div className="auth-form-wrap">
+          <div className="auth-heading">
+            <span className="auth-eyebrow">WELCOME BACK</span>
+            <h2>Sign in to your workspace</h2>
+            <p>Enter your details to continue managing your campaigns.</p>
           </div>
 
-          <div className="form-group">
-            <label>Password</label>
+          <form className="auth-form" onSubmit={handleLogin}>
+            <div className="auth-field">
+              <label htmlFor="login-username">Username</label>
+              <input
+                id="login-username"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="e.g. alex.smith"
+                autoComplete="username"
+                required
+              />
+            </div>
 
-            <input
-              type="password"
-              value={password}
-              onChange={(e) =>
-                setPassword(e.target.value)
-              }
-              placeholder="Enter password"
-              required
-            />
-          </div>
+            <div className="auth-field">
+              <label htmlFor="login-password">Password</label>
+              <input
+                id="login-password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                autoComplete="current-password"
+                required
+              />
+            </div>
 
-          {error && (
-            <p style={{ color: "red" }}>
-              {error}
-            </p>
-          )}
+            {error && <p className="auth-error">{error}</p>}
 
-          <button type="submit">
-            Login
-          </button>
-        </form>
-      </div>
-    </div>
+            <button className="auth-submit" type="submit" disabled={loading}>
+              {loading ? "Signing in..." : "Sign in"}
+              {!loading && <span aria-hidden="true">→</span>}
+            </button>
+          </form>
+
+          <p className="auth-switch">
+            New to SocialPilot?{" "}
+            <button type="button" onClick={onShowRegister}>
+              Create an account
+            </button>
+          </p>
+        </div>
+      </section>
+    </main>
   );
 }
 

@@ -8,12 +8,14 @@ function Register({ onRegister, onBackToLogin }) {
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleRegister = async (event) => {
     event.preventDefault();
 
     setError("");
     setSuccess("");
+    setLoading(true);
 
     try {
       await axios.post(
@@ -36,7 +38,6 @@ function Register({ onRegister, onBackToLogin }) {
       setTimeout(() => {
         onRegister();
       }, 1200);
-
     } catch (error) {
       console.error(error);
 
@@ -55,96 +56,102 @@ function Register({ onRegister, onBackToLogin }) {
       } else {
         setError("Unable to connect to server.");
       }
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="app">
-      <div className="card login-card">
+    <main className="auth-shell">
+      <section className="auth-visual auth-visual-register">
+        <div className="auth-brand">
+          <span className="auth-brand-mark">S</span>
+          <span>SocialPilot</span>
+        </div>
 
-        <h1 className="logo">
-          SocialPilot
-        </h1>
+        <div className="auth-visual-copy">
+          <span className="auth-kicker">BUILD YOUR MOMENTUM</span>
+          <h1>Your next great campaign starts here.</h1>
+          <p>
+            Bring your channels together, keep your voice consistent, and make
+            every post count.
+          </p>
+        </div>
 
-        <p className="subtitle">
-          Create your account
-        </p>
+        <div className="auth-visual-footer">
+          <span className="auth-dot"></span>
+          <span>One workspace. Every social moment.</span>
+        </div>
+      </section>
 
-        <form onSubmit={handleRegister}>
-
-          <div className="form-group">
-            <label>Username</label>
-
-            <input
-              type="text"
-              value={username}
-              onChange={(e) =>
-                setUsername(e.target.value)
-              }
-              placeholder="Choose a username"
-              required
-            />
+      <section className="auth-panel">
+        <div className="auth-form-wrap">
+          <div className="auth-heading">
+            <span className="auth-eyebrow">GET STARTED</span>
+            <h2>Create your workspace</h2>
+            <p>Set up your account and start planning with clarity.</p>
           </div>
 
-          <div className="form-group">
-            <label>Email</label>
+          <form className="auth-form" onSubmit={handleRegister}>
+            <div className="auth-field">
+              <label htmlFor="register-username">Username</label>
+              <input
+                id="register-username"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Choose a username"
+                autoComplete="username"
+                required
+              />
+            </div>
 
-            <input
-              type="email"
-              value={email}
-              onChange={(e) =>
-                setEmail(e.target.value)
-              }
-              placeholder="Enter your email"
-              required
-            />
-          </div>
+            <div className="auth-field">
+              <label htmlFor="register-email">Email address</label>
+              <input
+                id="register-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@company.com"
+                autoComplete="email"
+                required
+              />
+            </div>
 
-          <div className="form-group">
-            <label>Password</label>
+            <div className="auth-field">
+              <label htmlFor="register-password">Password</label>
+              <input
+                id="register-password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Create a secure password"
+                autoComplete="new-password"
+                minLength={8}
+                required
+              />
+              <small className="auth-hint">Use at least 8 characters.</small>
+            </div>
 
-            <input
-              type="password"
-              value={password}
-              onChange={(e) =>
-                setPassword(e.target.value)
-              }
-              placeholder="Create a password"
-              required
-            />
-          </div>
+            {error && <p className="auth-error">{error}</p>}
+            {success && <p className="auth-success">{success}</p>}
 
-          {error && (
-            <p style={{ color: "#dc2626" }}>
-              {error}
-            </p>
-          )}
+            <button className="auth-submit" type="submit" disabled={loading}>
+              {loading ? "Creating account..." : "Create account"}
+              {!loading && <span aria-hidden="true">→</span>}
+            </button>
+          </form>
 
-          {success && (
-            <p style={{ color: "#059669" }}>
-              {success}
-            </p>
-          )}
-
-          <button type="submit">
-            Create Account
-          </button>
-
-        </form>
-
-        <button
-          type="button"
-          onClick={onBackToLogin}
-          style={{
-            marginTop: "10px",
-            background: "#6b7280",
-          }}
-        >
-          Back to Login
-        </button>
-
-      </div>
-    </div>
+          <p className="auth-switch">
+            Already have an account?{" "}
+            <button type="button" onClick={onBackToLogin}>
+              Sign in
+            </button>
+          </p>
+        </div>
+      </section>
+    </main>
   );
 }
 

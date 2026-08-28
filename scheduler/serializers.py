@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
 
-from .models import ScheduledPost
+from .models import ScheduledPost, SocialAccount
 
 
 class ScheduledPostSerializer(serializers.ModelSerializer):
@@ -38,3 +38,21 @@ class RegisterSerializer(serializers.ModelSerializer):
         )
 
         return user
+
+
+class SocialAccountSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SocialAccount
+        fields = [
+            "id",
+            "platform",
+            "account_id",
+            "account_name",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "created_at",
+            "updated_at",
+        ]
