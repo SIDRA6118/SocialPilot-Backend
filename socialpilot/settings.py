@@ -25,7 +25,12 @@ SECRET_KEY = 'django-insecure-kze54af!-v$z&25rjs)z^)!b#n12m@_yw7@fr2197u@pe_)s%j
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    'localhost',
+    '127.0.0.1',
+    '0.0.0.0',
+    'testserver',
+]
 
 
 # Application definition
@@ -138,7 +143,11 @@ MAILERS = {
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "http://0.0.0.0:5173",
 ]
+
+# Allow local frontend development for Vite and direct browser requests.
+CORS_ALLOW_CREDENTIALS = True
 
 
 # Django REST Framework

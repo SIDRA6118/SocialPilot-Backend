@@ -37,12 +37,49 @@ class TeamMember(models.Model):
         ("administrator", "Administrator"),
     ]
 
+    ROLE_PERMISSIONS = {
+        "creator": {"view_posts", "create_post", "edit_post", "delete_post", "view_analytics"},
+        "marketing": {"view_posts", "create_post", "edit_post", "delete_post", "view_analytics"},
+        "business": {"view_posts", "view_analytics", "connect_channels"},
+        "administrator": {"view_posts", "create_post", "edit_post", "delete_post", "view_analytics", "connect_channels", "manage_team", "view_team", "manage_settings"},
+    }
+
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="owned_team_members")
     member = models.ForeignKey(User, on_delete=models.CASCADE, blank=True, null=True, related_name="team_memberships")
     invited_email = models.EmailField(blank=True)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="creator")
     status = models.CharField(max_length=20, default="invited")
     created_at = models.DateTimeField(auto_now_add=True)
+
+    @classmethod
+    def has_permission(cls, permission, role):
+        if not role:
+            return False
+
+        normalized_role = str(role).lower()
+        return permission in cls.ROLE_PERMISSIONS.get(normalized_role, set())
+
+    @classmethod
+    def get_user_role(cls, user):
+        if user is None or not getattr(user, "is_authenticated", False):
+            return None
+
+        if user.is_superuser:
+            return "administrator"
+
+        membership = cls.objects.filter(member=user).order_by("-created_at").first()
+        if membership:
+            return membership.role
+
+        if cls.objects.filter(owner=user).exists():
+            return "administrator"
+
+        return "creator"
+
+    @classmethod
+    def user_has_permission(cls, user, permission):
+        role = cls.get_user_role(user)
+        return cls.has_permission(permission, role)
 
     class Meta:
         constraints = [

@@ -28,6 +28,25 @@ const SOCIAL_PLATFORMS = [
   { name: "Pinterest", icon: "P", color: "#bd081c", description: "Pins, boards, and visual discovery" },
 ];
 
+const ROLE_LABELS = {
+  creator: "Content Creator",
+  marketing: "Marketing Team",
+  business: "Business User",
+  administrator: "Administrator",
+};
+
+const ROLE_PERMISSIONS = {
+  creator: ["view_posts", "create_post", "edit_post", "delete_post", "view_analytics"],
+  marketing: ["view_posts", "create_post", "edit_post", "delete_post", "view_analytics"],
+  business: ["view_posts", "view_analytics", "connect_channels"],
+  administrator: ["view_posts", "create_post", "edit_post", "delete_post", "view_analytics", "connect_channels", "manage_team", "view_team", "manage_settings"],
+};
+
+const canUserAccess = (role, permission) => {
+  const normalizedRole = (role || "administrator").toLowerCase();
+  return ROLE_PERMISSIONS[normalizedRole]?.includes(permission) || false;
+};
+
 ChartJS.register(
   ArcElement,
   BarElement,
@@ -251,10 +270,28 @@ function App() {
     email: localStorage.getItem("email") || "",
   }));
 
+  const [userRole, setUserRole] = useState(() => {
+    const storedRole = localStorage.getItem("socialpilot_role");
+    return storedRole || "administrator";
+  });
+
   const [profileDraft, setProfileDraft] = useState(profile);
   const [editingProfile, setEditingProfile] = useState(false);
 
+  const canAccess = useCallback(
+    (permission) => canUserAccess(userRole, permission),
+    [userRole]
+  );
+
+  const syncUserRole = useCallback((nextRole) => {
+    const normalizedRole = ROLE_LABELS[nextRole] ? nextRole : "administrator";
+    setUserRole(normalizedRole);
+    localStorage.setItem("socialpilot_role", normalizedRole);
+  }, []);
+
   const handleLogin = (account) => {
+    const nextRole = account.role || userRole || "administrator";
+    syncUserRole(nextRole);
     localStorage.setItem("username", account.username);
     setProfile((previousProfile) => ({
       ...previousProfile,
@@ -263,7 +300,7 @@ function App() {
 
     setSavedAccounts((previousAccounts) => {
       const nextAccounts = [
-        account,
+        { ...account, role: nextRole },
         ...previousAccounts.filter(
           (savedAccount) => savedAccount.username !== account.username
         ),
@@ -277,12 +314,15 @@ function App() {
   const handleSelectAccount = (account) => {
     localStorage.setItem("access_token", account.access);
     localStorage.setItem("refresh_token", account.refresh);
+    syncUserRole(account.role || "administrator");
     handleLogin(account);
   };
 
   const handleSwitchAccount = () => {
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
+    localStorage.removeItem("socialpilot_role");
+    setUserRole("administrator");
     setPosts([]);
     setEditingPost(null);
     setAuthScreen("login");
@@ -510,6 +550,11 @@ function App() {
 
     setMessage("");
 
+    if (editingPost ? !canAccess("edit_post") : !canAccess("create_post")) {
+      setMessage("Your role does not allow managing posts.");
+      return;
+    }
+
     if (!form.content.trim()) {
       setMessage("Please enter post content.");
       return;
@@ -627,6 +672,11 @@ function App() {
   // =====================================================
 
   const startEdit = (post) => {
+    if (!canAccess("edit_post")) {
+      setMessage("This role cannot edit scheduled posts.");
+      return;
+    }
+
     setEditingPost(post);
 
     let formattedDate = "";
@@ -679,6 +729,11 @@ function App() {
   // =====================================================
 
   const deletePost = async (id) => {
+    if (!canAccess("delete_post")) {
+      setMessage("Your role does not allow deleting posts.");
+      return;
+    }
+
     const confirmed = window.confirm(
       "Are you sure you want to delete this post?"
     );
@@ -933,6 +988,11 @@ function App() {
   };
 
   const togglePlatformConnection = (platform) => {
+    if (!canAccess("connect_channels")) {
+      setMessage("Your role does not allow connecting or disconnecting social accounts.");
+      return;
+    }
+
     const account = socialAccounts.find((item) => item.platform === platform.name.toLowerCase());
     if (account) {
       requestWithAuth(`${SOCIAL_ACCOUNTS_URL}${account.id}/`, { method: "DELETE" })
@@ -963,6 +1023,11 @@ function App() {
   };
 
   const inviteTeamMember = async () => {
+    if (!canAccess("manage_team")) {
+      setMessage("Only administrators can invite or remove team members.");
+      return;
+    }
+
     const invitedEmail = window.prompt("Team member email address:");
     if (!invitedEmail) return;
     const role = window.prompt("Role: creator, marketing, business, or administrator", "creator");
@@ -985,6 +1050,11 @@ function App() {
   };
 
   const removeTeamMember = async (memberId) => {
+    if (!canAccess("manage_team")) {
+      setMessage("Only administrators can manage team members.");
+      return;
+    }
+
     try {
       const response = await requestWithAuth(`${TEAM_URL}${memberId}/`, { method: "DELETE" });
       if (!response.ok) throw new Error("Removal failed");
@@ -2036,7 +2106,7 @@ function App() {
                 <strong>{profile.username}</strong>
                 <span>{profile.email || "Add an email address"}</span>
               </div>
-              <span className="profile-badge">Workspace owner</span>
+              <span className="profile-badge">{ROLE_LABELS[userRole] || "Administrator"}</span>
             </div>
           )}
         </section>
@@ -2201,7 +2271,7 @@ function App() {
               <h3>Team management</h3>
               <p>Invite collaborators and assign workspace roles.</p>
             </div>
-            <button type="button" className="connect-button" onClick={inviteTeamMember}>Invite member</button>
+            <button type="button" className="connect-button" onClick={inviteTeamMember} disabled={!canAccess("manage_team")}>Invite member</button>
           </div>
           {teamMembers.length === 0 ? (
             <p className="saved-signins-empty">No collaborators yet. You are the workspace owner.</p>
@@ -2420,7 +2490,7 @@ function App() {
             <div>
               <strong>{profile.username}</strong>
               <small>
-                Admin
+                {ROLE_LABELS[userRole] || "Administrator"}
               </small>
             </div>
           </div>
