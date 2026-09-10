@@ -28,12 +28,11 @@ SECRET_KEY = 'django-insecure-kze54af!-v$z&25rjs)z^)!b#n12m@_yw7@fr2197u@pe_)s%j
 DEBUG = True
 
 ALLOWED_HOSTS = [
-    'localhost',
-    '127.0.0.1',
-    '0.0.0.0',
-    'testserver',
+    "localhost",
+    "127.0.0.1",
+    "0.0.0.0",
+    "socialpilot-backend-mipp.onrender.com",
 ]
-
 
 # Application definition
 
