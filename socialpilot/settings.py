@@ -82,18 +82,25 @@ WSGI_APPLICATION = 'socialpilot.wsgi.application'
 
 
 # Database
-# https://docs.djangoproject.com/en/6.1/ref/settings/#databases
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'socialpilot',
-        'USER': 'postgres',
-        'PASSWORD': 'SocialPilot@2026',
-        'HOST': 'localhost',
-        'PORT': '5432',
+if DATABASE_URL:
+    import dj_database_url
+
+    DATABASES = {
+        "default": dj_database_url.parse(DATABASE_URL, conn_max_age=600)
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": "socialpilot",
+            "USER": "postgres",
+            "PASSWORD": "SocialPilot@2026",
+            "HOST": "localhost",
+            "PORT": "5432",
+        }
+    }
 
 # Password validation
 # https://docs.djangoproject.com/en/6.1/ref/settings/#auth-password-validators
