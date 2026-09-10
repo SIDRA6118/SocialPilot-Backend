@@ -98,8 +98,8 @@ urlpatterns = [
     ),
 
     path(
-        "instagram/callback/",
-        InstagramCallbackView.as_view(),
-        name="instagram-callback",
-    ),
+    "auth/instagram/callback/",
+    InstagramCallbackView.as_view(),
+    name="instagram-callback",
+),
 ]
