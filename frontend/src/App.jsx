@@ -13,11 +13,18 @@ import { Bar, Doughnut } from "react-chartjs-2";
 import "./App.css";
 import Login from "./Login";
 import Register from "./Register";
+import PrivacyPolicy from "./PrivacyPolicy";
 
 const API_URL = "http://127.0.0.1:8000/api/posts/";
 const SOCIAL_ACCOUNTS_URL = "http://127.0.0.1:8000/api/social-accounts/";
 const TEAM_URL = "http://127.0.0.1:8000/api/team-members/";
 const REFRESH_URL = "http://127.0.0.1:8000/api/token/refresh/";
+const LINKEDIN_CONNECT_URL =
+  "http://127.0.0.1:8000/api/linkedin/connect/";
+const FACEBOOK_CONNECT_URL =
+  "http://127.0.0.1:8000/api/facebook/connect/";
+const INSTAGRAM_CONNECT_URL =
+  "http://127.0.0.1:8000/api/instagram/connect/";
 
 const SOCIAL_PLATFORMS = [
   { name: "LinkedIn", icon: "in", color: "#0a66c2", description: "Professional updates and company pages" },
@@ -986,69 +993,327 @@ function App() {
   const goToToday = () => {
     setCurrentDate(new Date());
   };
+  const connectLinkedIn = async () => {
+  try {
+    setMessage("Opening LinkedIn authorization...");
+
+    const response = await requestWithAuth(LINKEDIN_CONNECT_URL, {
+      method: "GET",
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.detail ||
+          data.message ||
+          "LinkedIn authorization failed."
+      );
+    }
+
+    if (!data.authorization_url) {
+      throw new Error("Authorization URL missing from backend.");
+    }
+
+    window.location.assign(data.authorization_url);
+  } catch (error) {
+    console.error("LinkedIn connection error:", error);
+
+    setMessage(
+      error.message || "Unable to connect LinkedIn."
+    );
+  }
+};
+
+  const connectFacebook = async () => {
+  try {
+    setMessage("Opening Facebook authorization...");
+
+    const response = await requestWithAuth(FACEBOOK_CONNECT_URL, {
+      method: "GET",
+    });
+
+    let data = {};
+
+    try {
+      data = await response.json();
+    } catch {
+      data = {};
+    }
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
+        setIsAuthenticated(false);
+        throw new Error("Session expired. Please login again.");
+      }
+
+      throw new Error(
+        data.detail ||
+          data.message ||
+          "Facebook authorization failed."
+      );
+    }
+
+    if (!data.authorization_url) {
+      throw new Error("Facebook authorization URL missing from backend.");
+    }
+
+    window.location.assign(data.authorization_url);
+  } catch (error) {
+    console.error("Facebook connection error:", error);
+
+    setMessage(
+      error.message || "Unable to connect Facebook."
+    );
+  }
+};
+
+  const connectInstagram = async () => {
+  try {
+    setMessage("Opening Instagram authorization...");
+
+    const response = await requestWithAuth(INSTAGRAM_CONNECT_URL, {
+      method: "GET",
+    });
+
+    let data = {};
+
+    try {
+      data = await response.json();
+    } catch {
+      data = {};
+    }
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
+        setIsAuthenticated(false);
+        throw new Error("Session expired. Please login again.");
+      }
+
+      throw new Error(
+        data.detail ||
+          data.message ||
+          "Instagram authorization failed."
+      );
+    }
+
+    if (!data.authorization_url) {
+      throw new Error(
+        "Instagram authorization URL missing from backend."
+      );
+    }
+
+    window.location.assign(data.authorization_url);
+  } catch (error) {
+    console.error("Instagram connection error:", error);
+
+    setMessage(
+      error.message || "Unable to connect Instagram."
+    );
+  }
+};
 
   const togglePlatformConnection = (platform) => {
-    if (!canAccess("connect_channels")) {
-      setMessage("Your role does not allow connecting or disconnecting social accounts.");
-      return;
-    }
+  if (!canAccess("connect_channels")) {
+    setMessage(
+      "Your role does not allow connecting or disconnecting social accounts."
+    );
+    return;
+  }
 
-    const account = socialAccounts.find((item) => item.platform === platform.name.toLowerCase());
-    if (account) {
-      requestWithAuth(`${SOCIAL_ACCOUNTS_URL}${account.id}/`, { method: "DELETE" })
-        .then(() => {
-          setSocialAccounts((items) => items.filter((item) => item.id !== account.id));
-          setMessage(`${platform.name} disconnected.`);
-        })
-        .catch(() => setMessage("Unable to disconnect this account."));
-      return;
-    }
+  const platformKey = platform.name.toLowerCase();
 
-    const accountName = window.prompt(`Name for your ${platform.name} profile:`, `${platform.name} account`);
-    const accessToken = window.prompt("Provider access token (stored securely by the backend):");
-    if (!accountName || !accessToken) return;
-    requestWithAuth(SOCIAL_ACCOUNTS_URL, {
+  const account = socialAccounts.find(
+    (item) => item.platform === platformKey
+  );
+
+  // Already connected → disconnect
+  if (account) {
+    requestWithAuth(`${SOCIAL_ACCOUNTS_URL}${account.id}/`, {
+      method: "DELETE",
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          // eslint-disable-next-line no-useless-assignment
+          let data = {};
+
+          try {
+            data = await response.json();
+          } catch {
+            data = {};
+          }
+
+          throw new Error(
+            data.detail ||
+              data.message ||
+              "Unable to disconnect this account."
+          );
+        }
+
+        setSocialAccounts((items) =>
+          items.filter((item) => item.id !== account.id)
+        );
+
+        setMessage(`${platform.name} disconnected.`);
+      })
+      .catch((error) => {
+        console.error("Disconnect account error:", error);
+
+        setMessage(
+          error.message || "Unable to disconnect this account."
+        );
+      });
+
+    return;
+  }
+
+  // LinkedIn → OAuth connection
+  if (platformKey === "linkedin") {
+    connectLinkedIn();
+    return;
+  }
+
+  // Facebook → OAuth connection
+  if (platformKey === "facebook") {
+  connectFacebook();
+  return;
+  }
+
+   // Instagram → OAuth connection
+  if (platformKey === "instagram") {
+  connectInstagram();
+  return; 
+
+}  
+  // Other platforms → manual token connection
+  const accountName = window.prompt(
+    `Name for your ${platform.name} profile:`,
+    `${platform.name} account`
+  );
+
+  const accessToken = window.prompt(
+    "Provider access token (stored securely by the backend):"
+  );
+
+  if (!accountName || !accessToken) {
+    return;
+  }
+
+  requestWithAuth(SOCIAL_ACCOUNTS_URL, {
+    method: "POST",
+    body: JSON.stringify({
+      platform: platformKey,
+      account_name: accountName,
+      access_token: accessToken,
+    }),
+  })
+    .then(async (response) => {
+      let data = {};
+
+      try {
+        data = await response.json();
+      } catch {
+        data = {};
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          data.detail ||
+            data.message ||
+            "Account connection failed."
+        );
+      }
+
+      setSocialAccounts((items) => [...items, data]);
+
+      setMessage(`${platform.name} connected successfully.`);
+    })
+    .catch((error) => {
+      console.error("Connect account error:", error);
+
+      setMessage(
+        error.message || "Unable to connect this account."
+      );
+    });
+};
+  const inviteTeamMember = async () => {
+  if (!canAccess("manage_team")) {
+    setMessage("Only administrators can invite team members.");
+    return;
+  }
+
+  const email = window.prompt(
+    "Enter the email address of the team member:"
+  );
+
+  if (!email || !email.trim()) {
+    return;
+  }
+
+  const role = window.prompt(
+    "Enter role: creator, marketing, business, or administrator",
+    "creator"
+  );
+
+  const allowedRoles = [
+    "creator",
+    "marketing",
+    "business",
+    "administrator",
+  ];
+
+  const normalizedRole = (role || "creator").trim().toLowerCase();
+
+  if (!allowedRoles.includes(normalizedRole)) {
+    setMessage(
+      "Invalid role. Use creator, marketing, business, or administrator."
+    );
+    return;
+  }
+
+  try {
+    const response = await requestWithAuth(TEAM_URL, {
       method: "POST",
       body: JSON.stringify({
-        platform: platform.name.toLowerCase(),
-        account_name: accountName,
-        access_token: accessToken,
+        invited_email: email.trim(),
+        role: normalizedRole,
       }),
-    }).then(async (response) => {
-      if (!response.ok) throw new Error("Account connection failed");
-      const created = await response.json();
-      setSocialAccounts((items) => [...items, created]);
-      setMessage(`${platform.name} connected successfully.`);
-    }).catch(() => setMessage("Unable to connect this account."));
-  };
+    });
 
-  const inviteTeamMember = async () => {
-    if (!canAccess("manage_team")) {
-      setMessage("Only administrators can invite or remove team members.");
-      return;
-    }
+    let data = {};
 
-    const invitedEmail = window.prompt("Team member email address:");
-    if (!invitedEmail) return;
-    const role = window.prompt("Role: creator, marketing, business, or administrator", "creator");
-    if (!role || !["creator", "marketing", "business", "administrator"].includes(role)) {
-      setMessage("Please choose a valid team role.");
-      return;
-    }
     try {
-      const response = await requestWithAuth(TEAM_URL, {
-        method: "POST",
-        body: JSON.stringify({ invited_email: invitedEmail, role }),
-      });
-      if (!response.ok) throw new Error("Invitation failed");
-      const createdMember = await response.json();
-      setTeamMembers((members) => [...members, createdMember]);
-      setMessage(`Invitation sent to ${invitedEmail}.`);
+      data = await response.json();
     } catch {
-      setMessage("Unable to invite this team member.");
+      data = {};
     }
-  };
 
+    if (!response.ok) {
+      throw new Error(
+        data.detail ||
+          data.message ||
+          data.error ||
+          "Unable to invite team member."
+      );
+    }
+
+    setTeamMembers((members) => [...members, data]);
+
+    setMessage(
+      `Invitation created for ${email.trim()} successfully.`
+    );
+  } catch (error) {
+    console.error("Invite team member error:", error);
+
+    setMessage(
+      error.message || "Unable to invite team member."
+    );
+  }
+};
   const removeTeamMember = async (memberId) => {
     if (!canAccess("manage_team")) {
       setMessage("Only administrators can manage team members.");
@@ -2271,6 +2536,7 @@ function App() {
               <h3>Team management</h3>
               <p>Invite collaborators and assign workspace roles.</p>
             </div>
+            
             <button type="button" className="connect-button" onClick={inviteTeamMember} disabled={!canAccess("manage_team")}>Invite member</button>
           </div>
           {teamMembers.length === 0 ? (
@@ -2350,6 +2616,10 @@ function App() {
         return <PageRenderer renderPage={DashboardPage} />;
     }
   };
+
+  if (window.location.pathname === "/privacy-policy") {
+  return <PrivacyPolicy />;
+}
 
   // =====================================================
   // SHOW LOGIN IF NOT AUTHENTICATED

@@ -1,5 +1,33 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils import timezone
+
+
+class Draft(models.Model):
+    """Stores draft posts that are not yet scheduled"""
+    CONTENT_TYPES = [
+        ("text", "Text"),
+        ("image", "Image"),
+        ("video", "Video"),
+        ("carousel", "Carousel"),
+        ("story", "Story"),
+        ("reel", "Reel"),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="drafts")
+    content = models.TextField()
+    platform = models.CharField(max_length=50, blank=True)  # Optional until scheduling
+    content_type = models.CharField(max_length=20, choices=CONTENT_TYPES, default="text")
+    media_url = models.URLField(blank=True)
+    title = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Draft - {self.title or 'Untitled'} ({self.user.username})"
+
+    class Meta:
+        ordering = ["-updated_at"]
 
 
 class ScheduledPost(models.Model):
@@ -11,22 +39,105 @@ class ScheduledPost(models.Model):
         ("story", "Story"),
         ("reel", "Reel"),
     ]
+    
+    STATUS_CHOICES = [
+        ("draft", "Draft"),
+        ("scheduled", "Scheduled"),
+        ("processing", "Processing"),
+        ("published", "Published"),
+        ("failed", "Failed"),
+        ("cancelled", "Cancelled"),
+    ]
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="scheduled_posts")
     content = models.TextField()
     platform = models.CharField(max_length=50)
     content_type = models.CharField(max_length=20, choices=CONTENT_TYPES, default="text")
     media_url = models.URLField(blank=True)
     scheduled_time = models.DateTimeField()
-    status = models.CharField(max_length=20, default="scheduled")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="scheduled")
     is_recurring = models.BooleanField(default=False)
-    recurrence = models.CharField(max_length=30, blank=True)
+    recurrence = models.CharField(max_length=30, blank=True)  # daily, weekly, monthly, etc.
+    recurrence_end_date = models.DateTimeField(blank=True, null=True)  # When to stop recurring
+    parent_post = models.ForeignKey(
+        "self", 
+        on_delete=models.CASCADE, 
+        null=True, 
+        blank=True, 
+        related_name="recurring_instances"
+    )  # Link to original recurring post
     queue_position = models.PositiveIntegerField(default=0)
     published_at = models.DateTimeField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"{self.platform} - {self.scheduled_time}"
+
+    class Meta:
+        ordering = ["-scheduled_time"]
+
+
+class PublishingLog(models.Model):
+    """Tracks publishing attempts and results"""
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("processing", "Processing"),
+        ("published", "Published"),
+        ("failed", "Failed"),
+    ]
+
+    post = models.ForeignKey(
+        ScheduledPost,
+        on_delete=models.CASCADE,
+        related_name="publishing_logs"
+    )
+    platform = models.CharField(max_length=50)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+    platform_response = models.JSONField(blank=True, null=True)  # Store API response
+    error_message = models.TextField(blank=True)
+    attempts = models.PositiveIntegerField(default=0)
+    max_attempts = models.PositiveIntegerField(default=3)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.post.platform} - {self.status}"
+
+    class Meta:
+        ordering = ["-created_at"]
+
+
+class PublishingQueue(models.Model):
+    """Manages posts ready to be published"""
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("processing", "Processing"),
+        ("completed", "Completed"),
+        ("failed", "Failed"),
+    ]
+
+    post = models.ForeignKey(
+        ScheduledPost,
+        on_delete=models.CASCADE,
+        related_name="queue_entries"
+    )
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+    scheduled_for = models.DateTimeField()  # When post should be published
+    attempts = models.PositiveIntegerField(default=0)
+    last_attempt = models.DateTimeField(blank=True, null=True)
+    error_message = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["scheduled_for", "created_at"]
+        indexes = [
+            models.Index(fields=["status", "scheduled_for"]),
+        ]
+
+    def __str__(self):
+        return f"Queue: {self.post.platform} - {self.status}"
 
 
 class TeamMember(models.Model):
