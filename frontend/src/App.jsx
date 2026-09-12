@@ -15,16 +15,26 @@ import Login from "./Login";
 import Register from "./Register";
 import PrivacyPolicy from "./PrivacyPolicy";
 
-const API_URL = "http://127.0.0.1:8000/api/posts/";
-const SOCIAL_ACCOUNTS_URL ="https://socialpilot-backend-mipp.onrender.com/api/social-accounts/";
-const TEAM_URL = "http://127.0.0.1:8000/api/team-members/";
-const REFRESH_URL = "http://127.0.0.1:8000/api/token/refresh/";
+const API_URL =
+  "https://socialpilot-backend-mipp.onrender.com/api/posts/";
+
+const SOCIAL_ACCOUNTS_URL =
+  "https://socialpilot-backend-mipp.onrender.com/api/social-accounts/";
+
+const TEAM_URL =
+  "https://socialpilot-backend-mipp.onrender.com/api/team-members/";
+
+const REFRESH_URL =
+  "https://socialpilot-backend-mipp.onrender.com/api/token/refresh/";
+
 const LINKEDIN_CONNECT_URL =
-  "http://127.0.0.1:8000/api/linkedin/connect/";
+  "https://socialpilot-backend-mipp.onrender.com/api/linkedin/connect/";
+
 const FACEBOOK_CONNECT_URL =
-  "http://127.0.0.1:8000/api/facebook/connect/";
+  "https://socialpilot-backend-mipp.onrender.com/api/facebook/connect/";
+
 const INSTAGRAM_CONNECT_URL =
-  "https://socialpilot-backend-mipp.onrender.com/api/instagram/connect/";m
+  "https://socialpilot-backend-mipp.onrender.com/api/instagram/connect/";
 
 const SOCIAL_PLATFORMS = [
   { name: "LinkedIn", icon: "in", color: "#0a66c2", description: "Professional updates and company pages" },
